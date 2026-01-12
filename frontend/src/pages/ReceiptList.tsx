@@ -105,7 +105,7 @@ export default function ReceiptList() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Buscar por número, nombre o NIT..."
-            className="input pl-10 w-full sm:w-80"
+            className="input pl-11 w-full sm:w-80"
           />
         </div>
       </div>
