@@ -2,6 +2,134 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ================================
+   CUSTOM RECEIPT FRAMEWORK - CSS VARIABLES
+   Based on Genesis One theme system
+   ================================ */
+
+/* Semantic Colors (shared across themes) */
+:root {
+  /* Status Colors */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Action Aliases */
+  --color-accept: var(--color-success);
+  --color-cancel: var(--color-danger);
+  --color-edit: var(--color-warning);
+  --color-save: var(--color-success);
+  --color-delete: var(--color-danger);
+
+  /* Border Radius */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+
+  /* Font */
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ================================
+   LIGHT THEME (Default)
+   ================================ */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Primary */
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #3b82f6;
+
+  /* Surfaces */
+  --surface-background: #f8fafc;
+  --surface-card: #ffffff;
+  --surface-card-hover: #f1f5f9;
+  --surface-elevated: #ffffff;
+  --surface-input: #ffffff;
+  --surface-input-focus: #f8fafc;
+
+  /* Text */
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --text-inverse: #f8fafc;
+
+  /* Borders */
+  --border-default: #e2e8f0;
+  --border-focus: var(--color-primary);
+
+  color: var(--text-primary);
+  background-color: var(--surface-background);
+}
+
+/* ================================
+   DARK THEME
+   ================================ */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Primary */
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-primary-light: #60a5fa;
+
+  /* Surfaces */
+  --surface-background: #0f172a;
+  --surface-card: #1e293b;
+  --surface-card-hover: #334155;
+  --surface-elevated: #334155;
+  --surface-input: #1e293b;
+  --surface-input-focus: #334155;
+
+  /* Text */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-inverse: #0f172a;
+
+  /* Borders */
+  --border-default: #334155;
+  --border-focus: var(--color-primary);
+
+  color: var(--text-primary);
+  background-color: var(--surface-background);
+}
+
+/* ================================
+   BASE STYLES
+   ================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
 /* Prevent iOS zoom on input focus */
 @media screen and (max-width: 768px) {
   input, textarea, select {
@@ -9,7 +137,91 @@
   }
 }
 
-/* Print styles for half-page receipt (8" x 5.5") */
+/* Focus visible for accessibility */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Buttons and clickable elements */
+button,
+[role="button"],
+a,
+select,
+.clickable {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ================================
+   COMPONENT UTILITIES
+   ================================ */
+
+/* Card */
+.card {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+}
+
+/* Input */
+.input {
+  background-color: var(--surface-input);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  padding: 0.5rem 0.75rem;
+  transition: border-color var(--transition-fast);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  background-color: var(--surface-input-focus);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Button Primary */
+.btn-primary {
+  background-color: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  transition: background-color var(--transition-fast);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+}
+
+/* Button Secondary */
+.btn-secondary {
+  background-color: var(--surface-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  transition: background-color var(--transition-fast);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--surface-card-hover);
+}
+
+/* ================================
+   PRINT STYLES
+   Half-page receipt (8" x 5.5")
+   ================================ */
 @media print {
   @page {
     size: letter;
