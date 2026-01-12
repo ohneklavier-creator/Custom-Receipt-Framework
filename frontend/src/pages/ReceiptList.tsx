@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, FileText, Eye, Printer, MoreVertical } from 'lucide-react';
+import { FileText, Eye, Printer, MoreVertical } from 'lucide-react';
 
 // Mock data for testing
 const mockReceipts = [
@@ -94,18 +94,13 @@ export default function ReceiptList() {
         </div>
 
         {/* Search */}
-        <div className="relative">
-          <Search
-            size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2"
-            style={{ color: 'var(--text-muted)' }}
-          />
+        <div>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Buscar por número, nombre o NIT..."
-            className="input pl-11 w-full sm:w-80"
+            className="input w-full sm:w-80"
           />
         </div>
       </div>
