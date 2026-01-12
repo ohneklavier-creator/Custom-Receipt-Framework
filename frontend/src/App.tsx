@@ -2,6 +2,7 @@ import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { FileText, Search, Settings as SettingsIcon, Plus } from 'lucide-react';
 import { ThemeProvider } from './context/ThemeContext';
 import Settings from './pages/Settings';
+import CreateReceipt from './pages/CreateReceipt';
 
 function AppContent() {
   const location = useLocation();
@@ -88,16 +89,6 @@ function ReceiptList() {
   );
 }
 
-function CreateReceipt() {
-  return (
-    <div className="card p-6">
-      <h1 className="text-2xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
-        Nuevo Recibo
-      </h1>
-      <p style={{ color: 'var(--text-muted)' }}>Formulario de recibo aparecerá aquí...</p>
-    </div>
-  );
-}
 
 function ReceiptDetail() {
   return (
