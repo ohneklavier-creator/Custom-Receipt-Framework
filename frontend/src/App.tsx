@@ -3,6 +3,7 @@ import { FileText, Search, Settings as SettingsIcon, Plus } from 'lucide-react';
 import { ThemeProvider } from './context/ThemeContext';
 import Settings from './pages/Settings';
 import CreateReceipt from './pages/CreateReceipt';
+import ReceiptList from './pages/ReceiptList';
 
 function AppContent() {
   const location = useLocation();
@@ -77,19 +78,7 @@ function App() {
   );
 }
 
-// Placeholder components - will be moved to pages/ folder
-function ReceiptList() {
-  return (
-    <div className="card p-6">
-      <h1 className="text-2xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
-        Recibos Recientes
-      </h1>
-      <p style={{ color: 'var(--text-muted)' }}>Lista de recibos aparecerá aquí...</p>
-    </div>
-  );
-}
-
-
+// Placeholder component - will be moved to pages/ folder
 function ReceiptDetail() {
   return (
     <div className="card p-6">
