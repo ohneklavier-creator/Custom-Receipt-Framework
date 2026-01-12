@@ -19,8 +19,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (saved === 'light' || saved === 'dark') {
       return saved;
     }
-    // Default to light theme
-    return 'light';
+    // Default to dark theme
+    return 'dark';
   });
 
   // Apply theme to document

@@ -47,42 +47,9 @@
 }
 
 /* ================================
-   LIGHT THEME (Default)
+   DARK THEME (Default)
    ================================ */
 :root,
-[data-theme="light"] {
-  color-scheme: light;
-
-  /* Primary */
-  --color-primary: #2563eb;
-  --color-primary-hover: #1d4ed8;
-  --color-primary-light: #3b82f6;
-
-  /* Surfaces */
-  --surface-background: #f8fafc;
-  --surface-card: #ffffff;
-  --surface-card-hover: #f1f5f9;
-  --surface-elevated: #ffffff;
-  --surface-input: #ffffff;
-  --surface-input-focus: #f8fafc;
-
-  /* Text */
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --text-inverse: #f8fafc;
-
-  /* Borders */
-  --border-default: #e2e8f0;
-  --border-focus: var(--color-primary);
-
-  color: var(--text-primary);
-  background-color: var(--surface-background);
-}
-
-/* ================================
-   DARK THEME
-   ================================ */
 [data-theme="dark"] {
   color-scheme: dark;
 
@@ -107,6 +74,39 @@
 
   /* Borders */
   --border-default: #334155;
+  --border-focus: var(--color-primary);
+
+  color: var(--text-primary);
+  background-color: var(--surface-background);
+}
+
+/* ================================
+   LIGHT THEME
+   ================================ */
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Primary */
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #3b82f6;
+
+  /* Surfaces */
+  --surface-background: #f8fafc;
+  --surface-card: #ffffff;
+  --surface-card-hover: #f1f5f9;
+  --surface-elevated: #ffffff;
+  --surface-input: #ffffff;
+  --surface-input-focus: #f8fafc;
+
+  /* Text */
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --text-inverse: #f8fafc;
+
+  /* Borders */
+  --border-default: #e2e8f0;
   --border-focus: var(--color-primary);
 
   color: var(--text-primary);
