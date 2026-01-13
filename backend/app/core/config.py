@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+import secrets
 
 
 class Settings(BaseSettings):
@@ -13,6 +14,11 @@ class Settings(BaseSettings):
     # Receipt settings
     receipt_prefix: str = "RECIBO"
     receipt_number_digits: int = 8
+
+    # Authentication
+    secret_key: str = secrets.token_hex(32)  # Generate random secret if not provided
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
 
     class Config:
         env_file = ".env"

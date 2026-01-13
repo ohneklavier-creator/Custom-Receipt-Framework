@@ -28,6 +28,10 @@ async def health():
     return {"status": "healthy"}
 
 
-# API routes will be added here
-# from app.api.v1 import receipts
-# app.include_router(receipts.router, prefix="/api/v1/receipts", tags=["receipts"])
+# API routes
+from app.api.v1 import receipts, auth, backup, templates
+
+app.include_router(receipts.router, prefix="/api/v1")
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(backup.router, prefix="/api/v1")
+app.include_router(templates.router, prefix="/api/v1")

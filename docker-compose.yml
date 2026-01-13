@@ -26,6 +26,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-receipts}:${POSTGRES_PASSWORD:-receipts}@db:5432/${POSTGRES_DB:-receipts}
       DEBUG: ${DEBUG:-true}
+      SECRET_KEY: ${SECRET_KEY:-receipts_secret_key_change_in_production_2024}
     ports:
       - "8001:8001"
     depends_on:

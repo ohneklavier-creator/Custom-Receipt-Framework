@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.core.database import Base
 
 # Import all models here so they are registered with Base.metadata
-# from app.models import receipt  # Uncomment when models are created
+from app.models import receipt, user, template
 
 config = context.config
 

@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, Trash2, Save, Printer, X, Check, FileStack } from 'lucide-react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { FileText, Plus, Trash2, Save, ArrowLeft, X, Check } from 'lucide-react';
 import SignaturePad from 'signature_pad';
-import { createReceipt, ReceiptStatus, RECEIPT_STATUS_LABELS } from '../api/receipts';
-import { getTemplates, getTemplate, createTemplate, TemplateListItem } from '../api/templates';
+import { getReceipt, updateReceipt, Receipt, ReceiptStatus, RECEIPT_STATUS_LABELS } from '../api/receipts';
 
 interface LineItem {
   id: number;
@@ -12,10 +11,16 @@ interface LineItem {
   unitPrice: number;
 }
 
-export default function CreateReceipt() {
+export default function EditReceipt() {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
+  // Loading state
+  const [isLoadingReceipt, setIsLoadingReceipt] = useState(true);
+  const [originalReceipt, setOriginalReceipt] = useState<Receipt | null>(null);
+
   // Form state
+  const [receiptNumber, setReceiptNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerNit, setCustomerNit] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -23,20 +28,12 @@ export default function CreateReceipt() {
   const [status, setStatus] = useState<ReceiptStatus>('completed');
   const [notes, setNotes] = useState('');
   const [signature, setSignature] = useState<string | null>(null);
+  const [receiptDate, setReceiptDate] = useState('');
 
   // UI state
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
-
-  // Templates state
-  const [templates, setTemplates] = useState<TemplateListItem[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
-  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
-  const [templateName, setTemplateName] = useState('');
-  const [templateDescription, setTemplateDescription] = useState('');
-  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
 
   // Signature pad refs
   const signatureCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -47,6 +44,47 @@ export default function CreateReceipt() {
     { id: 1, description: '', quantity: 1, unitPrice: 0 }
   ]);
 
+  // Fetch receipt data
+  useEffect(() => {
+    const fetchReceipt = async () => {
+      if (!id) return;
+
+      setIsLoadingReceipt(true);
+      try {
+        const data = await getReceipt(parseInt(id));
+        setOriginalReceipt(data);
+
+        // Populate form fields
+        setReceiptNumber(data.receipt_number);
+        setCustomerName(data.customer_name);
+        setCustomerNit(data.customer_nit || '');
+        setCustomerPhone(data.customer_phone || '');
+        setCustomerEmail(data.customer_email || '');
+        setStatus((data.status as ReceiptStatus) || 'completed');
+        setNotes(data.notes || '');
+        setSignature(data.signature || null);
+        setReceiptDate(data.date);
+
+        // Populate line items
+        if (data.items && data.items.length > 0) {
+          setLineItems(data.items.map((item, index) => ({
+            id: item.id || index + 1,
+            description: item.description,
+            quantity: typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity,
+            unitPrice: typeof item.unit_price === 'string' ? parseFloat(item.unit_price) : item.unit_price,
+          })));
+        }
+      } catch (err) {
+        console.error('Error fetching receipt:', err);
+        setError('Error al cargar el recibo.');
+      } finally {
+        setIsLoadingReceipt(false);
+      }
+    };
+
+    fetchReceipt();
+  }, [id]);
+
   // Calculate totals
   const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
   const total = subtotal;
@@ -56,7 +94,6 @@ export default function CreateReceipt() {
     if (showSignaturePad && signatureCanvasRef.current) {
       const canvas = signatureCanvasRef.current;
 
-      // Set canvas size to match container
       const resizeCanvas = () => {
         const ratio = Math.max(window.devicePixelRatio || 1, 1);
         const container = canvas.parentElement;
@@ -81,95 +118,6 @@ export default function CreateReceipt() {
     }
   }, [showSignaturePad]);
 
-  // Load templates on mount
-  useEffect(() => {
-    const loadTemplates = async () => {
-      try {
-        const data = await getTemplates();
-        setTemplates(data);
-      } catch (err) {
-        console.error('Error loading templates:', err);
-        // Silently fail - templates are optional
-      }
-    };
-    loadTemplates();
-  }, []);
-
-  // Handle template selection
-  const handleTemplateSelect = async (templateId: string) => {
-    setSelectedTemplateId(templateId);
-
-    if (!templateId) {
-      return;
-    }
-
-    setIsLoadingTemplate(true);
-    try {
-      const template = await getTemplate(parseInt(templateId, 10));
-
-      // Apply template data to form
-      if (template.customer_name) setCustomerName(template.customer_name);
-      if (template.customer_nit) setCustomerNit(template.customer_nit);
-      if (template.notes) setNotes(template.notes);
-
-      // Apply template items
-      if (template.items && template.items.length > 0) {
-        setLineItems(template.items.map((item, index) => ({
-          id: index + 1,
-          description: item.description,
-          quantity: item.quantity,
-          unitPrice: item.unit_price,
-        })));
-      }
-    } catch (err) {
-      console.error('Error loading template:', err);
-      setError('Error al cargar la plantilla');
-    } finally {
-      setIsLoadingTemplate(false);
-    }
-  };
-
-  // Handle save as template
-  const handleSaveAsTemplate = async () => {
-    if (!templateName.trim()) {
-      return;
-    }
-
-    setIsSavingTemplate(true);
-    try {
-      const validItems = lineItems.filter(item => item.description.trim() !== '');
-
-      await createTemplate({
-        name: templateName.trim(),
-        description: templateDescription.trim() || undefined,
-        customer_name: customerName.trim() || undefined,
-        customer_nit: customerNit.trim() || undefined,
-        notes: notes.trim() || undefined,
-        items: validItems.length > 0 ? validItems.map(item => ({
-          description: item.description.trim(),
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-        })) : undefined,
-      });
-
-      // Refresh templates list
-      const updatedTemplates = await getTemplates();
-      setTemplates(updatedTemplates);
-
-      // Close modal and reset
-      setShowSaveTemplateModal(false);
-      setTemplateName('');
-      setTemplateDescription('');
-
-      alert('Plantilla guardada exitosamente');
-    } catch (err) {
-      console.error('Error saving template:', err);
-      setError('Error al guardar la plantilla');
-    } finally {
-      setIsSavingTemplate(false);
-    }
-  };
-
   // Add new line item
   const addLineItem = () => {
     const newId = Math.max(...lineItems.map(i => i.id), 0) + 1;
@@ -177,16 +125,16 @@ export default function CreateReceipt() {
   };
 
   // Remove line item
-  const removeLineItem = (id: number) => {
+  const removeLineItem = (itemId: number) => {
     if (lineItems.length > 1) {
-      setLineItems(lineItems.filter(item => item.id !== id));
+      setLineItems(lineItems.filter(item => item.id !== itemId));
     }
   };
 
   // Update line item
-  const updateLineItem = (id: number, field: keyof LineItem, value: string | number) => {
+  const updateLineItem = (itemId: number, field: keyof LineItem, value: string | number) => {
     setLineItems(lineItems.map(item =>
-      item.id === id ? { ...item, [field]: value } : item
+      item.id === itemId ? { ...item, [field]: value } : item
     ));
   };
 
@@ -195,9 +143,10 @@ export default function CreateReceipt() {
     return `Q${amount.toFixed(2)}`;
   };
 
-  // Get current date formatted
-  const getCurrentDate = () => {
-    return new Date().toLocaleDateString('es-GT', {
+  // Format date for display
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('es-GT', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -227,6 +176,8 @@ export default function CreateReceipt() {
 
   // Handle form submission
   const handleSave = async () => {
+    if (!id || !originalReceipt) return;
+
     // Validate required fields
     if (!customerName.trim()) {
       setError('El nombre del cliente es requerido');
@@ -258,34 +209,77 @@ export default function CreateReceipt() {
         })),
       };
 
-      const result = await createReceipt(receiptData);
+      await updateReceipt(parseInt(id), receiptData);
 
-      // Navigate to receipt list or show success
-      alert(`Recibo ${result.receipt_number} creado exitosamente!`);
-      navigate('/');
+      alert(`Recibo ${receiptNumber} actualizado exitosamente!`);
+      navigate(`/receipt/${id}`);
     } catch (err) {
-      console.error('Error creating receipt:', err);
-      setError('Error al guardar el recibo. Por favor intente de nuevo.');
+      console.error('Error updating receipt:', err);
+      setError('Error al actualizar el recibo. Por favor intente de nuevo.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (isLoadingReceipt) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: 'var(--color-primary)' }}></div>
+          <p style={{ color: 'var(--text-muted)' }}>Cargando recibo...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!originalReceipt) {
+    return (
+      <div className="space-y-6 max-w-4xl mx-auto">
+        <Link
+          to="/"
+          className="flex items-center gap-2 hover:underline"
+          style={{ color: 'var(--color-primary)' }}
+        >
+          <ArrowLeft size={20} />
+          Volver a la lista
+        </Link>
+
+        <div className="card p-12 text-center">
+          <FileText size={48} className="mx-auto mb-4" style={{ color: 'var(--text-muted)' }} />
+          <h3 className="text-lg font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+            Recibo no encontrado
+          </h3>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
+          <Link
+            to={`/receipt/${id}`}
+            className="p-2 rounded-lg hover:bg-opacity-10 transition-colors"
+            style={{ color: 'var(--text-muted)' }}
+            title="Cancelar"
+          >
+            <ArrowLeft size={24} />
+          </Link>
           <FileText size={28} style={{ color: 'var(--color-primary)' }} />
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            Nuevo Recibo
+            Editar Recibo
           </h1>
         </div>
         <div className="flex gap-2">
-          <button className="btn-secondary flex items-center gap-2">
-            <Printer size={18} />
-            <span className="hidden sm:inline">Imprimir</span>
-          </button>
+          <Link
+            to={`/receipt/${id}`}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <X size={18} />
+            <span className="hidden sm:inline">Cancelar</span>
+          </Link>
           <button
             onClick={handleSave}
             disabled={isLoading}
@@ -295,52 +289,6 @@ export default function CreateReceipt() {
             <span className="hidden sm:inline">{isLoading ? 'Guardando...' : 'Guardar'}</span>
           </button>
         </div>
-      </div>
-
-      {/* Template Selector */}
-      <div className="card p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-            <FileStack size={20} />
-            <span className="font-medium">Plantilla:</span>
-          </div>
-          <div className="flex flex-1 items-center gap-3">
-            {templates.length > 0 ? (
-              <select
-                value={selectedTemplateId}
-                onChange={(e) => handleTemplateSelect(e.target.value)}
-                disabled={isLoadingTemplate}
-                className="input flex-1 max-w-xs"
-              >
-                <option value="">-- Seleccionar plantilla --</option>
-                {templates.map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.name}
-                    {template.description ? ` - ${template.description}` : ''}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                No hay plantillas guardadas
-              </span>
-            )}
-            {isLoadingTemplate && (
-              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Cargando...
-              </span>
-            )}
-            <button
-              onClick={() => setShowSaveTemplateModal(true)}
-              className="btn-secondary text-sm whitespace-nowrap"
-            >
-              Guardar como Plantilla
-            </button>
-          </div>
-        </div>
-        <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
-          Las plantillas rellenan automáticamente los datos del cliente y artículos.
-        </p>
       </div>
 
       {/* Error Message */}
@@ -366,14 +314,14 @@ export default function CreateReceipt() {
                 cursor: 'not-allowed'
               }}
             >
-              (Se generará al guardar)
+              {receiptNumber}
             </div>
             <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-              Generado automáticamente
+              No se puede modificar
             </p>
           </div>
 
-          {/* Date */}
+          {/* Date - Non-editable */}
           <div>
             <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
               Fecha
@@ -385,7 +333,7 @@ export default function CreateReceipt() {
                 cursor: 'not-allowed'
               }}
             >
-              {getCurrentDate()}
+              {receiptDate && formatDate(receiptDate)}
             </div>
           </div>
 
@@ -441,9 +389,6 @@ export default function CreateReceipt() {
               placeholder="Ej: 12345678-9 o CF"
               className="input w-full"
             />
-            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-              Ingrese CF si no tiene NIT
-            </p>
           </div>
 
           {/* Phone */}
@@ -637,10 +582,13 @@ export default function CreateReceipt() {
 
       {/* Bottom Action Buttons (Mobile) */}
       <div className="flex gap-3 pb-6 md:hidden">
-        <button className="btn-secondary flex-1 flex items-center justify-center gap-2 py-3">
-          <Printer size={20} />
-          Imprimir
-        </button>
+        <Link
+          to={`/receipt/${id}`}
+          className="btn-secondary flex-1 flex items-center justify-center gap-2 py-3"
+        >
+          <X size={20} />
+          Cancelar
+        </Link>
         <button
           onClick={handleSave}
           disabled={isLoading}
@@ -691,77 +639,6 @@ export default function CreateReceipt() {
                 <Check size={20} />
                 Guardar Firma
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Save as Template Modal */}
-      {showSaveTemplateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="card w-full max-w-md mx-4 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Guardar como Plantilla
-              </h3>
-              <button
-                onClick={() => setShowSaveTemplateModal(false)}
-                className="p-2 rounded-lg transition-colors"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-                  Nombre de la Plantilla *
-                </label>
-                <input
-                  type="text"
-                  value={templateName}
-                  onChange={(e) => setTemplateName(e.target.value)}
-                  placeholder="Ej: Cliente frecuente, Servicio mensual"
-                  className="input w-full"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-                  Descripción (opcional)
-                </label>
-                <input
-                  type="text"
-                  value={templateDescription}
-                  onChange={(e) => setTemplateDescription(e.target.value)}
-                  placeholder="Breve descripción de la plantilla"
-                  className="input w-full"
-                />
-              </div>
-
-              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Se guardarán los datos del cliente, notas y artículos actuales.
-              </p>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setShowSaveTemplateModal(false)}
-                  className="btn-secondary flex-1"
-                  disabled={isSavingTemplate}
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSaveAsTemplate}
-                  disabled={!templateName.trim() || isSavingTemplate}
-                  className="btn-primary flex-1 flex items-center justify-center gap-2"
-                >
-                  <Save size={18} />
-                  {isSavingTemplate ? 'Guardando...' : 'Guardar'}
-                </button>
-              </div>
             </div>
           </div>
         </div>

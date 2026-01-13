@@ -224,18 +224,223 @@ button:disabled {
    ================================ */
 @media print {
   @page {
-    size: letter;
-    margin: 0.5in;
+    size: 8in 5.5in;
+    margin: 0.25in;
   }
 
-  .receipt-print {
-    width: 7in;
-    height: 5in;
-    page-break-after: always;
-    padding: 0.25in;
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  .no-print {
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 10pt !important;
+  }
+
+  /* Hide non-printable elements */
+  .no-print,
+  nav,
+  header,
+  footer,
+  button,
+  .btn-primary,
+  .btn-secondary {
     display: none !important;
   }
+
+  /* Receipt container */
+  .receipt-print {
+    width: 7.5in;
+    max-height: 5in;
+    padding: 0.25in;
+    background: white !important;
+    color: black !important;
+    font-family: Arial, Helvetica, sans-serif;
+    page-break-after: always;
+    page-break-inside: avoid;
+  }
+
+  /* Receipt header */
+  .receipt-header {
+    text-align: center;
+    border-bottom: 2px solid black;
+    padding-bottom: 0.15in;
+    margin-bottom: 0.15in;
+  }
+
+  .receipt-header h1 {
+    font-size: 16pt;
+    font-weight: bold;
+    margin: 0 0 0.05in 0;
+  }
+
+  .receipt-number {
+    font-family: 'Courier New', monospace;
+    font-size: 14pt;
+    font-weight: bold;
+    color: black !important;
+  }
+
+  .receipt-date {
+    font-size: 9pt;
+    color: #333 !important;
+  }
+
+  /* Customer info */
+  .receipt-customer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.1in;
+    margin-bottom: 0.15in;
+    font-size: 9pt;
+  }
+
+  .receipt-customer-label {
+    font-weight: bold;
+    color: #333 !important;
+  }
+
+  /* Items table */
+  .receipt-items {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 0.15in;
+    font-size: 9pt;
+  }
+
+  .receipt-items th {
+    background: #f0f0f0 !important;
+    border: 1px solid #ccc;
+    padding: 0.05in 0.1in;
+    text-align: left;
+    font-weight: bold;
+  }
+
+  .receipt-items td {
+    border: 1px solid #ccc;
+    padding: 0.05in 0.1in;
+  }
+
+  .receipt-items .qty,
+  .receipt-items .price,
+  .receipt-items .total {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  /* Totals */
+  .receipt-totals {
+    text-align: right;
+    margin-bottom: 0.15in;
+  }
+
+  .receipt-total-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5in;
+    font-size: 9pt;
+    padding: 0.02in 0;
+  }
+
+  .receipt-total-row.grand-total {
+    font-size: 12pt;
+    font-weight: bold;
+    border-top: 2px solid black;
+    padding-top: 0.05in;
+    margin-top: 0.05in;
+  }
+
+  /* Notes */
+  .receipt-notes {
+    font-size: 8pt;
+    color: #333 !important;
+    border-top: 1px dashed #999;
+    padding-top: 0.1in;
+    margin-bottom: 0.15in;
+  }
+
+  /* Signature */
+  .receipt-signature {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-top: 0.2in;
+  }
+
+  .receipt-signature-box {
+    width: 2.5in;
+    text-align: center;
+  }
+
+  .receipt-signature-line {
+    border-top: 1px solid black;
+    margin-top: 0.5in;
+    padding-top: 0.05in;
+    font-size: 8pt;
+  }
+
+  .receipt-signature img {
+    max-height: 0.6in;
+    max-width: 2.5in;
+  }
+
+  /* Footer */
+  .receipt-footer {
+    text-align: center;
+    font-size: 7pt;
+    color: #666 !important;
+    border-top: 1px solid #ccc;
+    padding-top: 0.05in;
+    margin-top: 0.1in;
+  }
+}
+
+/* Print preview styles (for on-screen preview) */
+.print-preview {
+  background: white;
+  color: black;
+  width: 8in;
+  min-height: 5.5in;
+  padding: 0.5in;
+  margin: 0 auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11pt;
+}
+
+.print-preview .receipt-header {
+  text-align: center;
+  border-bottom: 2px solid black;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.print-preview .receipt-number {
+  font-family: 'Courier New', monospace;
+  font-size: 18pt;
+  font-weight: bold;
+}
+
+.print-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+
+.print-preview th,
+.print-preview td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: left;
+}
+
+.print-preview th {
+  background: #f0f0f0;
+  font-weight: bold;
+}
+
+.print-preview .text-right {
+  text-align: right;
 }
