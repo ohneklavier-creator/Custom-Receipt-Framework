@@ -51,10 +51,21 @@ class ReceiptBase(BaseModel):
     customer_nit: Optional[str] = Field(None, max_length=50)
     customer_phone: Optional[str] = Field(None, max_length=50)
     customer_email: Optional[EmailStr] = None
+    customer_address: Optional[str] = Field(None, max_length=500)
     date: Optional[date] = None
     notes: Optional[str] = None
     signature: Optional[str] = None  # Base64 encoded image
+    institution: Optional[str] = Field(None, max_length=255)
+    concept: Optional[str] = Field(None, max_length=500)
+    payment_method: Optional[str] = Field(None, max_length=50)
     custom_fields: Optional[dict] = None
+
+    @field_validator('payment_method')
+    @classmethod
+    def validate_payment_method(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in ['Cheque', 'Transferencia', 'Efectivo', 'Otro']:
+            raise ValueError('payment_method must be Cheque, Transferencia, Efectivo, or Otro')
+        return v
 
 
 class ReceiptCreate(ReceiptBase):
@@ -76,12 +87,23 @@ class ReceiptUpdate(BaseModel):
     customer_nit: Optional[str] = Field(None, max_length=50)
     customer_phone: Optional[str] = Field(None, max_length=50)
     customer_email: Optional[EmailStr] = None
+    customer_address: Optional[str] = Field(None, max_length=500)
     date: Optional[date] = None
     status: Optional[ReceiptStatus] = None
     notes: Optional[str] = None
     signature: Optional[str] = None
+    institution: Optional[str] = Field(None, max_length=255)
+    concept: Optional[str] = Field(None, max_length=500)
+    payment_method: Optional[str] = Field(None, max_length=50)
     custom_fields: Optional[dict] = None
     items: Optional[List[ReceiptItemCreate]] = None
+
+    @field_validator('payment_method')
+    @classmethod
+    def validate_payment_method(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in ['Cheque', 'Transferencia', 'Efectivo', 'Otro']:
+            raise ValueError('payment_method must be Cheque, Transferencia, Efectivo, or Otro')
+        return v
 
 
 class ReceiptResponse(BaseModel):
@@ -92,10 +114,14 @@ class ReceiptResponse(BaseModel):
     customer_nit: Optional[str] = None
     customer_phone: Optional[str] = None
     customer_email: Optional[EmailStr] = None
+    customer_address: Optional[str] = None
     date: date
     status: ReceiptStatus
     notes: Optional[str] = None
     signature: Optional[str] = None
+    institution: Optional[str] = None
+    concept: Optional[str] = None
+    payment_method: Optional[str] = None
     custom_fields: Optional[dict] = None
     subtotal: Decimal
     total: Decimal

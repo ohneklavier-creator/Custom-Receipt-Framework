@@ -1,4 +1,6 @@
 import { Receipt } from '../api/receipts';
+import { useFieldVisibility } from '../context/FieldVisibilityContext';
+import { numberToWordsSpanish } from '../utils/numberToWords';
 
 interface ReceiptPrintProps {
   receipt: Receipt;
@@ -11,6 +13,7 @@ export default function ReceiptPrint({
   companyName = 'EMPRESA',
   companyInfo = 'Dirección de la empresa | Tel: 0000-0000'
 }: ReceiptPrintProps) {
+  const { fieldVisibility } = useFieldVisibility();
   const formatCurrency = (amount: number | string) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
     return `Q${num.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -45,41 +48,55 @@ export default function ReceiptPrint({
           <span className="receipt-customer-label">NIT: </span>
           {receipt.customer_nit || 'CF'}
         </div>
-        {receipt.customer_phone && (
+        {fieldVisibility.customer_phone && receipt.customer_phone && (
           <div>
             <span className="receipt-customer-label">Tel: </span>
             {receipt.customer_phone}
           </div>
         )}
-        {receipt.customer_email && (
+        {fieldVisibility.customer_email && receipt.customer_email && (
           <div>
             <span className="receipt-customer-label">Email: </span>
             {receipt.customer_email}
           </div>
         )}
+        {fieldVisibility.customer_address && receipt.customer_address && (
+          <div>
+            <span className="receipt-customer-label">Dirección: </span>
+            {receipt.customer_address}
+          </div>
+        )}
+        {fieldVisibility.institution && (
+          <div>
+            <span className="receipt-customer-label">Institución: </span>
+            {receipt.institution || companyName}
+          </div>
+        )}
       </div>
 
-      {/* Items Table */}
-      <table className="receipt-items">
-        <thead>
-          <tr>
-            <th>Descripción</th>
-            <th className="qty">Cant.</th>
-            <th className="price">P. Unit.</th>
-            <th className="total">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {receipt.items.map((item, index) => (
-            <tr key={item.id || index}>
-              <td>{item.description}</td>
-              <td className="qty">{item.quantity}</td>
-              <td className="price">{formatCurrency(item.unit_price)}</td>
-              <td className="total">{formatCurrency(item.total || 0)}</td>
+      {/* Items Table - conditional */}
+      {fieldVisibility.line_items_in_print && (
+        <table className="receipt-items">
+          <thead>
+            <tr>
+              <th>Descripción</th>
+              <th className="qty">Cant.</th>
+              <th className="price">P. Unit.</th>
+              <th className="total">Total</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {receipt.items.map((item, index) => (
+              <tr key={item.id || index}>
+                <td>{item.description}</td>
+                <td className="qty">{item.quantity}</td>
+                <td className="price">{formatCurrency(item.unit_price)}</td>
+                <td className="total">{formatCurrency(item.total || 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       {/* Totals */}
       <div className="receipt-totals">
@@ -93,29 +110,52 @@ export default function ReceiptPrint({
         </div>
       </div>
 
-      {/* Notes */}
-      {receipt.notes && (
+      {/* Amount in Words - conditional */}
+      {fieldVisibility.amount_in_words && (
+        <div className="receipt-notes">
+          <strong>Cantidad en letras:</strong> {numberToWordsSpanish(receipt.total)}
+        </div>
+      )}
+
+      {/* Concept - conditional */}
+      {fieldVisibility.concept && receipt.concept && (
+        <div className="receipt-notes">
+          <strong>Concepto:</strong> {receipt.concept}
+        </div>
+      )}
+
+      {/* Payment Method - conditional */}
+      {fieldVisibility.payment_method && receipt.payment_method && (
+        <div className="receipt-notes">
+          <strong>Forma de Pago:</strong> {receipt.payment_method}
+        </div>
+      )}
+
+      {/* Notes - conditional */}
+      {fieldVisibility.notes && receipt.notes && (
         <div className="receipt-notes">
           <strong>Notas:</strong> {receipt.notes}
         </div>
       )}
 
-      {/* Signature */}
-      <div className="receipt-signature">
-        <div className="receipt-signature-box">
-          {receipt.signature ? (
-            <>
-              <img src={receipt.signature} alt="Firma" />
+      {/* Signature - conditional */}
+      {fieldVisibility.signature && (
+        <div className="receipt-signature">
+          <div className="receipt-signature-box">
+            {receipt.signature ? (
+              <>
+                <img src={receipt.signature} alt="Firma" />
+                <div className="receipt-signature-line">Firma del Cliente</div>
+              </>
+            ) : (
               <div className="receipt-signature-line">Firma del Cliente</div>
-            </>
-          ) : (
-            <div className="receipt-signature-line">Firma del Cliente</div>
-          )}
+            )}
+          </div>
+          <div className="receipt-signature-box">
+            <div className="receipt-signature-line">Firma Autorizada</div>
+          </div>
         </div>
-        <div className="receipt-signature-box">
-          <div className="receipt-signature-line">Firma Autorizada</div>
-        </div>
-      </div>
+      )}
 
       {/* Footer */}
       <div className="receipt-footer">
@@ -126,7 +166,36 @@ export default function ReceiptPrint({
 }
 
 // Print function helper
-export function printReceipt(receipt: Receipt, companyName?: string, companyInfo?: string) {
+export function printReceipt(
+  receipt: Receipt,
+  companyName?: string,
+  companyInfo?: string,
+  fieldVisibility?: {
+    customer_address: boolean;
+    customer_phone: boolean;
+    customer_email: boolean;
+    institution: boolean;
+    amount_in_words: boolean;
+    concept: boolean;
+    payment_method: boolean;
+    notes: boolean;
+    signature: boolean;
+    line_items_in_print: boolean;
+  }
+) {
+  // Default to all fields visible if not provided
+  const visibility = fieldVisibility || {
+    customer_address: true,
+    customer_phone: true,
+    customer_email: true,
+    institution: true,
+    amount_in_words: true,
+    concept: true,
+    payment_method: true,
+    notes: true,
+    signature: true,
+    line_items_in_print: true,
+  };
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
     alert('Por favor permita las ventanas emergentes para imprimir.');
@@ -305,11 +374,13 @@ export function printReceipt(receipt: Receipt, companyName?: string, companyInfo
       <div class="customer">
         <div><span class="customer-label">Cliente:</span> ${receipt.customer_name}</div>
         <div><span class="customer-label">NIT:</span> ${receipt.customer_nit || 'CF'}</div>
-        ${receipt.customer_phone ? `<div><span class="customer-label">Tel:</span> ${receipt.customer_phone}</div>` : ''}
-        ${receipt.customer_email ? `<div><span class="customer-label">Email:</span> ${receipt.customer_email}</div>` : ''}
+        ${visibility.customer_phone && receipt.customer_phone ? `<div><span class="customer-label">Tel:</span> ${receipt.customer_phone}</div>` : ''}
+        ${visibility.customer_email && receipt.customer_email ? `<div><span class="customer-label">Email:</span> ${receipt.customer_email}</div>` : ''}
+        ${visibility.customer_address && receipt.customer_address ? `<div><span class="customer-label">Dirección:</span> ${receipt.customer_address}</div>` : ''}
+        ${visibility.institution ? `<div><span class="customer-label">Institución:</span> ${receipt.institution || companyName || 'EMPRESA'}</div>` : ''}
       </div>
 
-      <table>
+      ${visibility.line_items_in_print ? `<table>
         <thead>
           <tr>
             <th>Descripción</th>
@@ -328,7 +399,7 @@ export function printReceipt(receipt: Receipt, companyName?: string, companyInfo
             </tr>
           `).join('')}
         </tbody>
-      </table>
+      </table>` : ''}
 
       <div class="totals">
         <div class="total-row">
@@ -341,13 +412,31 @@ export function printReceipt(receipt: Receipt, companyName?: string, companyInfo
         </div>
       </div>
 
-      ${receipt.notes ? `
+      ${visibility.amount_in_words ? `
+        <div class="notes">
+          <strong>Cantidad en letras:</strong> ${numberToWordsSpanish(receipt.total)}
+        </div>
+      ` : ''}
+
+      ${visibility.concept && receipt.concept ? `
+        <div class="notes">
+          <strong>Concepto:</strong> ${receipt.concept}
+        </div>
+      ` : ''}
+
+      ${visibility.payment_method && receipt.payment_method ? `
+        <div class="notes">
+          <strong>Forma de Pago:</strong> ${receipt.payment_method}
+        </div>
+      ` : ''}
+
+      ${visibility.notes && receipt.notes ? `
         <div class="notes">
           <strong>Notas:</strong> ${receipt.notes}
         </div>
       ` : ''}
 
-      <div class="signatures">
+      ${visibility.signature ? `<div class="signatures">
         <div class="signature-box">
           ${receipt.signature ? `<img src="${receipt.signature}" alt="Firma" />` : ''}
           <div class="signature-line">Firma del Cliente</div>
@@ -355,7 +444,7 @@ export function printReceipt(receipt: Receipt, companyName?: string, companyInfo
         <div class="signature-box">
           <div class="signature-line">Firma Autorizada</div>
         </div>
-      </div>
+      </div>` : ''}
 
       <div class="footer">
         <p>Gracias por su preferencia</p>

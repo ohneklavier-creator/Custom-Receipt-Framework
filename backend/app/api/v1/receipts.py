@@ -16,6 +16,24 @@ from app.services import receipt_service
 router = APIRouter(prefix="/receipts", tags=["receipts"])
 
 
+@router.get("/next-number")
+async def get_next_receipt_number(
+    session: AsyncSession = Depends(get_db)
+):
+    """
+    Get the next receipt number that will be assigned.
+    Useful for preview purposes before saving a receipt.
+    """
+    try:
+        next_number = await receipt_service.generate_receipt_number(session)
+        return {"next_number": next_number}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting next receipt number: {str(e)}"
+        )
+
+
 @router.post("", response_model=ReceiptResponse, status_code=status.HTTP_201_CREATED)
 async def create_receipt(
     receipt_data: ReceiptCreate,

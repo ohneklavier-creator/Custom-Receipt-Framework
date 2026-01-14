@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Sun, Moon, Settings as SettingsIcon, Building2, Save, Download, Upload, AlertCircle, CheckCircle } from 'lucide-react';
+import { Sun, Moon, Settings as SettingsIcon, Building2, Save, Download, Upload, AlertCircle, CheckCircle, Eye } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { downloadBackup, importBackup, ImportResult } from '../api/backup';
+import { useFieldVisibility } from '../context/FieldVisibilityContext';
+import { updateSettings } from '../api/settings';
 
 // Company settings storage helpers
 export function getCompanySettings() {
@@ -21,6 +23,7 @@ export function saveCompanySettings(settings: { companyName: string; companyInfo
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
+  const { fieldVisibility, updateFieldVisibility } = useFieldVisibility();
 
   // Company settings state
   const [companyName, setCompanyName] = useState('');
@@ -43,14 +46,51 @@ export default function Settings() {
   }, []);
 
   // Save company settings
-  const handleSaveCompany = () => {
+  const handleSaveCompany = async () => {
     setIsSaving(true);
-    saveCompanySettings({ companyName, companyInfo });
-    setSaveMessage('Configuración guardada');
-    setTimeout(() => {
-      setIsSaving(false);
-      setSaveMessage(null);
-    }, 2000);
+    try {
+      await updateSettings({ company_name: companyName, company_info: companyInfo });
+      saveCompanySettings({ companyName, companyInfo });
+      setSaveMessage('Configuración guardada');
+    } catch (error) {
+      console.error('Error saving company settings:', error);
+      setSaveMessage('Error al guardar');
+    } finally {
+      setTimeout(() => {
+        setIsSaving(false);
+        setSaveMessage(null);
+      }, 2000);
+    }
+  };
+
+  // Handle field visibility toggle
+  const handleFieldToggle = async (field: keyof typeof fieldVisibility, value: boolean) => {
+    console.log('=== SETTINGS PAGE: handleFieldToggle START ===');
+    console.log('Field:', field);
+    console.log('New value:', value);
+    console.log('Current fieldVisibility:', fieldVisibility);
+
+    try {
+      console.log('Calling updateFieldVisibility...');
+      await updateFieldVisibility({ [field]: value } as any);
+      console.log('=== SETTINGS PAGE: handleFieldToggle SUCCESS ===');
+    } catch (error) {
+      console.error('=== SETTINGS PAGE: handleFieldToggle ERROR ===');
+      console.error('Error object:', error);
+      console.error('Error type:', typeof error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
+      if (typeof error === 'object' && error !== null && 'response' in error) {
+        const axiosError = error as any;
+        console.error('Axios error response:', axiosError.response);
+        console.error('Axios error status:', axiosError.response?.status);
+        console.error('Axios error data:', axiosError.response?.data);
+        console.error('Axios error headers:', axiosError.response?.headers);
+      }
+      alert('Error al actualizar la visibilidad del campo');
+    }
   };
 
   // Handle backup export
@@ -172,6 +212,176 @@ export default function Settings() {
               </span>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Field Visibility Card */}
+      <div className="card p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Eye size={20} style={{ color: 'var(--color-primary)' }} />
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Campos del Recibo
+          </h2>
+        </div>
+
+        <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
+          Controla qué campos aparecen en los formularios y en la impresión de recibos.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Customer Address */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.customer_address}
+              onChange={(e) => handleFieldToggle('customer_address', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Dirección del Cliente</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>DIRECCION</div>
+            </div>
+          </label>
+
+          {/* Customer Phone */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.customer_phone}
+              onChange={(e) => handleFieldToggle('customer_phone', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Teléfono</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>TELEFONO</div>
+            </div>
+          </label>
+
+          {/* Customer Email */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.customer_email}
+              onChange={(e) => handleFieldToggle('customer_email', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Correo Electrónico</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>EMAIL</div>
+            </div>
+          </label>
+
+          {/* Institution */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.institution}
+              onChange={(e) => handleFieldToggle('institution', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Institución</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>INSTITUCION</div>
+            </div>
+          </label>
+
+          {/* Amount in Words */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.amount_in_words}
+              onChange={(e) => handleFieldToggle('amount_in_words', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Cantidad en Letras</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>CANTIDAD DE LETRAS</div>
+            </div>
+          </label>
+
+          {/* Concept */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.concept}
+              onChange={(e) => handleFieldToggle('concept', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Concepto</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>CONCEPTO</div>
+            </div>
+          </label>
+
+          {/* Payment Method */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.payment_method}
+              onChange={(e) => handleFieldToggle('payment_method', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Forma de Pago</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>FORMA DE PAGO</div>
+            </div>
+          </label>
+
+          {/* Notes */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.notes}
+              onChange={(e) => handleFieldToggle('notes', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Notas</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>NOTAS</div>
+            </div>
+          </label>
+
+          {/* Signature */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.signature}
+              onChange={(e) => handleFieldToggle('signature', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Firma</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>FIRMA</div>
+            </div>
+          </label>
+
+          {/* Line Items (form) */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.line_items ?? true}
+              onChange={(e) => handleFieldToggle('line_items', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Detalle del Recibo</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Sección de artículos/líneas en formulario</div>
+            </div>
+          </label>
+
+          {/* Line Items in Print */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.line_items_in_print}
+              onChange={(e) => handleFieldToggle('line_items_in_print', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Tabla de Artículos en Impresión</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Mostrar desglose de artículos al imprimir</div>
+            </div>
+          </label>
         </div>
       </div>
 

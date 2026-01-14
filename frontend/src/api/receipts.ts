@@ -36,15 +36,28 @@ export interface ReceiptItem {
   line_order?: number;
 }
 
+export type PaymentMethod = 'Cheque' | 'Transferencia' | 'Efectivo' | 'Otro';
+
+export const PAYMENT_METHODS: Record<string, PaymentMethod> = {
+  cheque: 'Cheque',
+  transferencia: 'Transferencia',
+  efectivo: 'Efectivo',
+  otro: 'Otro',
+} as const;
+
 export interface ReceiptCreate {
   customer_name: string;
   customer_nit?: string;
   customer_phone?: string;
   customer_email?: string;
+  customer_address?: string;
   date?: string;
   status?: ReceiptStatus;
   notes?: string;
   signature?: string;
+  institution?: string;
+  concept?: string;
+  payment_method?: PaymentMethod;
   items: ReceiptItem[];
 }
 
@@ -55,10 +68,14 @@ export interface Receipt {
   customer_nit?: string;
   customer_phone?: string;
   customer_email?: string;
+  customer_address?: string;
   date: string;
   status: ReceiptStatus;
   notes?: string;
   signature?: string;
+  institution?: string;
+  concept?: string;
+  payment_method?: PaymentMethod;
   subtotal: number;
   total: number;
   items: ReceiptItem[];

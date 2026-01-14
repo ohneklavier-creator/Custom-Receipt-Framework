@@ -4,10 +4,12 @@ import { FileText, Printer, ArrowLeft, Trash2, Edit } from 'lucide-react';
 import { getReceipt, deleteReceipt, Receipt, RECEIPT_STATUS_LABELS, RECEIPT_STATUS_COLORS } from '../api/receipts';
 import { printReceipt } from '../components/ReceiptPrint';
 import { getCompanySettings } from './Settings';
+import { useFieldVisibility } from '../context/FieldVisibilityContext';
 
 export default function ReceiptDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { fieldVisibility } = useFieldVisibility();
 
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,7 +57,7 @@ export default function ReceiptDetail() {
   const handlePrint = () => {
     if (receipt) {
       const { companyName, companyInfo } = getCompanySettings();
-      printReceipt(receipt, companyName, companyInfo);
+      printReceipt(receipt, companyName, companyInfo, fieldVisibility);
     }
   };
 

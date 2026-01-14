@@ -1,9 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, Trash2, Save, Printer, X, Check, FileStack } from 'lucide-react';
+import { FileText, Plus, Trash2, Save, Printer, X, Check, FileStack, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import SignaturePad from 'signature_pad';
-import { createReceipt, ReceiptStatus, RECEIPT_STATUS_LABELS } from '../api/receipts';
+import { createReceipt, ReceiptStatus, RECEIPT_STATUS_LABELS, PAYMENT_METHODS, PaymentMethod } from '../api/receipts';
 import { getTemplates, getTemplate, createTemplate, TemplateListItem } from '../api/templates';
+import { useFieldVisibility } from '../context/FieldVisibilityContext';
+import { numberToWordsSpanish } from '../utils/numberToWords';
 
 interface LineItem {
   id: number;
@@ -14,12 +16,17 @@ interface LineItem {
 
 export default function CreateReceipt() {
   const navigate = useNavigate();
+  const { fieldVisibility } = useFieldVisibility();
 
   // Form state
   const [customerName, setCustomerName] = useState('');
   const [customerNit, setCustomerNit] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [institution, setInstitution] = useState('');
+  const [concept, setConcept] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
   const [status, setStatus] = useState<ReceiptStatus>('completed');
   const [notes, setNotes] = useState('');
   const [signature, setSignature] = useState<string | null>(null);
@@ -31,12 +38,15 @@ export default function CreateReceipt() {
 
   // Templates state
   const [templates, setTemplates] = useState<TemplateListItem[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Closed by default
+  const [showLineItems, setShowLineItems] = useState(true); // Toggle for line items section
+  const [previewReceiptNumber, setPreviewReceiptNumber] = useState('RECIBO-00000001');
 
   // Signature pad refs
   const signatureCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -50,6 +60,11 @@ export default function CreateReceipt() {
   // Calculate totals
   const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
   const total = subtotal;
+
+  // Live amount-in-words calculation
+  const amountInWords = useMemo(() => {
+    return numberToWordsSpanish(total);
+  }, [total]);
 
   // Initialize signature pad when modal opens
   useEffect(() => {
@@ -81,7 +96,7 @@ export default function CreateReceipt() {
     }
   }, [showSignaturePad]);
 
-  // Load templates on mount
+  // Load templates and next receipt number on mount
   useEffect(() => {
     const loadTemplates = async () => {
       try {
@@ -92,24 +107,42 @@ export default function CreateReceipt() {
         // Silently fail - templates are optional
       }
     };
+    const loadNextReceiptNumber = async () => {
+      try {
+        const response = await fetch('/api/v1/receipts/next-number', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setPreviewReceiptNumber(data.next_number);
+        }
+      } catch (err) {
+        console.error('Error loading next receipt number:', err);
+        // Keep default preview number
+      }
+    };
     loadTemplates();
+    loadNextReceiptNumber();
   }, []);
 
   // Handle template selection
-  const handleTemplateSelect = async (templateId: string) => {
+  const handleTemplateSelect = async (templateId: number) => {
     setSelectedTemplateId(templateId);
-
-    if (!templateId) {
-      return;
-    }
-
     setIsLoadingTemplate(true);
     try {
-      const template = await getTemplate(parseInt(templateId, 10));
+      const template = await getTemplate(templateId);
 
       // Apply template data to form
       if (template.customer_name) setCustomerName(template.customer_name);
       if (template.customer_nit) setCustomerNit(template.customer_nit);
+      if (template.customer_phone) setCustomerPhone(template.customer_phone);
+      if (template.customer_email) setCustomerEmail(template.customer_email);
+      if (template.customer_address) setCustomerAddress(template.customer_address);
+      if (template.institution) setInstitution(template.institution);
+      if (template.concept) setConcept(template.concept);
+      if (template.payment_method) setPaymentMethod(template.payment_method as PaymentMethod);
       if (template.notes) setNotes(template.notes);
 
       // Apply template items
@@ -144,6 +177,12 @@ export default function CreateReceipt() {
         description: templateDescription.trim() || undefined,
         customer_name: customerName.trim() || undefined,
         customer_nit: customerNit.trim() || undefined,
+        customer_phone: customerPhone.trim() || undefined,
+        customer_email: customerEmail.trim() || undefined,
+        customer_address: customerAddress.trim() || undefined,
+        institution: institution.trim() || undefined,
+        concept: concept.trim() || undefined,
+        payment_method: paymentMethod || undefined,
         notes: notes.trim() || undefined,
         items: validItems.length > 0 ? validItems.map(item => ({
           description: item.description.trim(),
@@ -248,6 +287,10 @@ export default function CreateReceipt() {
         customer_nit: customerNit.trim() || undefined,
         customer_phone: customerPhone.trim() || undefined,
         customer_email: customerEmail.trim() || undefined,
+        customer_address: customerAddress.trim() || undefined,
+        institution: institution.trim() || undefined,
+        concept: concept.trim() || undefined,
+        payment_method: paymentMethod || undefined,
         status: status,
         notes: notes.trim() || undefined,
         signature: signature || undefined,
@@ -272,383 +315,572 @@ export default function CreateReceipt() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <FileText size={28} style={{ color: 'var(--color-primary)' }} />
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            Nuevo Recibo
-          </h1>
-        </div>
-        <div className="flex gap-2">
-          <button className="btn-secondary flex items-center gap-2">
-            <Printer size={18} />
-            <span className="hidden sm:inline">Imprimir</span>
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isLoading}
-            className="btn-primary flex items-center gap-2"
-          >
-            <Save size={18} />
-            <span className="hidden sm:inline">{isLoading ? 'Guardando...' : 'Guardar'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Template Selector */}
-      <div className="card p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
-            <FileStack size={20} />
-            <span className="font-medium">Plantilla:</span>
-          </div>
-          <div className="flex flex-1 items-center gap-3">
-            {templates.length > 0 ? (
-              <select
-                value={selectedTemplateId}
-                onChange={(e) => handleTemplateSelect(e.target.value)}
-                disabled={isLoadingTemplate}
-                className="input flex-1 max-w-xs"
+    <div className="pb-20" style={{ backgroundColor: 'var(--surface-default)' }}>
+      {/* Templates Sidebar - Fixed position, slides in/out */}
+      <div
+        className={`fixed left-0 top-0 bottom-0 z-40 transition-transform duration-300 border-r ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+        style={{
+          borderColor: 'var(--border-default)',
+          backgroundColor: 'var(--surface-default)',
+          width: '280px'
+        }}
+      >
+        <div className="h-full flex flex-col">
+          {/* Sidebar Header */}
+          <div className="p-4 border-b" style={{ borderColor: 'var(--border-default)' }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <FileStack size={20} style={{ color: 'var(--color-primary)' }} />
+                <h2 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Plantillas</h2>
+              </div>
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                title="Cerrar"
               >
-                <option value="">-- Seleccionar plantilla --</option>
-                {templates.map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.name}
-                    {template.description ? ` - ${template.description}` : ''}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                No hay plantillas guardadas
-              </span>
-            )}
-            {isLoadingTemplate && (
-              <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Cargando...
-              </span>
-            )}
+                <X size={18} style={{ color: 'var(--text-muted)' }} />
+              </button>
+            </div>
             <button
               onClick={() => setShowSaveTemplateModal(true)}
-              className="btn-secondary text-sm whitespace-nowrap"
+              className="btn-primary w-full text-sm flex items-center justify-center gap-2"
             >
-              Guardar como Plantilla
+              <Plus size={16} />
+              Nueva Plantilla
             </button>
           </div>
+
+          {/* Templates List */}
+          <div className="flex-1 overflow-y-auto">
+            {templates.length === 0 ? (
+              <div className="p-4 text-center">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  No hay plantillas guardadas
+                </p>
+              </div>
+            ) : (
+              <div className="p-2">
+                {templates.map((template) => (
+                  <button
+                    key={template.id}
+                    onClick={() => handleTemplateSelect(template.id)}
+                    disabled={isLoadingTemplate}
+                    className={`w-full text-left p-3 rounded-lg mb-2 transition-all ${
+                      selectedTemplateId === template.id
+                        ? 'bg-blue-500/20 border-2 border-blue-500'
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-800 border-2 border-transparent'
+                    }`}
+                    style={{
+                      backgroundColor: selectedTemplateId === template.id ? 'var(--color-primary-alpha)' : undefined,
+                    }}
+                  >
+                    <div className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>
+                      {template.name}
+                    </div>
+                    {template.description && (
+                      <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                        {template.description}
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Loading indicator */}
+          {isLoadingTemplate && (
+            <div className="p-3 border-t" style={{ borderColor: 'var(--border-default)' }}>
+              <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
+                Cargando plantilla...
+              </p>
+            </div>
+          )}
         </div>
-        <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
-          Las plantillas rellenan automáticamente los datos del cliente y artículos.
-        </p>
       </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-          <p className="text-red-500">{error}</p>
-        </div>
+      {/* Sidebar backdrop for mobile */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
       )}
 
-      {/* Receipt Number, Date & Status */}
-      <div className="card p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Receipt Number - Non-editable */}
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-              Número de Recibo
-            </label>
-            <div
-              className="input w-full font-mono text-lg font-bold"
-              style={{
-                backgroundColor: 'var(--surface-card-hover)',
-                color: 'var(--color-primary)',
-                cursor: 'not-allowed'
-              }}
-            >
-              (Se generará al guardar)
-            </div>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-              Generado automáticamente
-            </p>
-          </div>
-
-          {/* Date */}
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-              Fecha
-            </label>
-            <div
-              className="input w-full"
-              style={{
-                backgroundColor: 'var(--surface-card-hover)',
-                cursor: 'not-allowed'
-              }}
-            >
-              {getCurrentDate()}
-            </div>
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-              Estado
-            </label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as ReceiptStatus)}
-              className="input w-full"
-            >
-              <option value="draft">{RECEIPT_STATUS_LABELS.draft}</option>
-              <option value="completed">{RECEIPT_STATUS_LABELS.completed}</option>
-              <option value="paid">{RECEIPT_STATUS_LABELS.paid}</option>
-              <option value="cancelled">{RECEIPT_STATUS_LABELS.cancelled}</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Customer Information */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-          Información del Cliente
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Customer Name */}
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-              Nombre del Cliente *
-            </label>
-            <input
-              type="text"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Nombre completo o empresa"
-              className="input w-full"
-            />
-          </div>
-
-          {/* NIT */}
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-              NIT
-            </label>
-            <input
-              type="text"
-              value={customerNit}
-              onChange={(e) => setCustomerNit(e.target.value)}
-              placeholder="Ej: 12345678-9 o CF"
-              className="input w-full"
-            />
-            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-              Ingrese CF si no tiene NIT
-            </p>
-          </div>
-
-          {/* Phone */}
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-              Teléfono
-            </label>
-            <input
-              type="tel"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="Ej: 5555-1234"
-              className="input w-full"
-            />
-          </div>
-
-          {/* Email */}
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-              Correo Electrónico
-            </label>
-            <input
-              type="email"
-              value={customerEmail}
-              onChange={(e) => setCustomerEmail(e.target.value)}
-              placeholder="correo@ejemplo.com"
-              className="input w-full"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Line Items */}
-      <div className="card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Detalle del Recibo
-          </h2>
-          <button
-            onClick={addLineItem}
-            className="btn-secondary flex items-center gap-2 text-sm"
-          >
-            <Plus size={16} />
-            Agregar Línea
-          </button>
-        </div>
-
-        {/* Header Row */}
-        <div className="hidden md:grid md:grid-cols-12 gap-4 mb-2 text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
-          <div className="col-span-6">Descripción</div>
-          <div className="col-span-2 text-center">Cantidad</div>
-          <div className="col-span-2 text-right">Precio Unit.</div>
-          <div className="col-span-1 text-right">Total</div>
-          <div className="col-span-1"></div>
-        </div>
-
-        {/* Line Items */}
-        <div className="space-y-3">
-          {lineItems.map((item) => (
-            <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 p-3 rounded-lg" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
-              {/* Description */}
-              <div className="md:col-span-6">
-                <label className="block text-xs mb-1 md:hidden" style={{ color: 'var(--text-muted)' }}>Descripción</label>
-                <input
-                  type="text"
-                  value={item.description}
-                  onChange={(e) => updateLineItem(item.id, 'description', e.target.value)}
-                  placeholder="Descripción del producto o servicio"
-                  className="input w-full"
-                />
-              </div>
-
-              {/* Quantity */}
-              <div className="md:col-span-2">
-                <label className="block text-xs mb-1 md:hidden" style={{ color: 'var(--text-muted)' }}>Cantidad</label>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={item.quantity}
-                  onChange={(e) => updateLineItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                  className="input w-full text-center"
-                />
-              </div>
-
-              {/* Unit Price */}
-              <div className="md:col-span-2">
-                <label className="block text-xs mb-1 md:hidden" style={{ color: 'var(--text-muted)' }}>Precio Unitario</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={item.unitPrice}
-                  onChange={(e) => updateLineItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  className="input w-full text-right"
-                />
-              </div>
-
-              {/* Line Total */}
-              <div className="md:col-span-1 flex items-center justify-end">
-                <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                  {formatCurrency(item.quantity * item.unitPrice)}
-                </span>
-              </div>
-
-              {/* Delete Button */}
-              <div className="md:col-span-1 flex items-center justify-end">
-                <button
-                  onClick={() => removeLineItem(item.id)}
-                  disabled={lineItems.length === 1}
-                  className="p-2 rounded-lg transition-colors hover:bg-red-500/10"
-                  style={{
-                    color: lineItems.length === 1 ? 'var(--text-muted)' : 'var(--color-danger)',
-                    cursor: lineItems.length === 1 ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Totals */}
-        <div className="mt-6 pt-4 border-t" style={{ borderColor: 'var(--border-default)' }}>
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex justify-between w-full md:w-64">
-              <span style={{ color: 'var(--text-secondary)' }}>Subtotal:</span>
-              <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                {formatCurrency(subtotal)}
-              </span>
-            </div>
-            <div className="flex justify-between w-full md:w-64 text-xl font-bold">
-              <span style={{ color: 'var(--text-primary)' }}>Total:</span>
-              <span style={{ color: 'var(--color-primary)' }}>
-                {formatCurrency(total)}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Notes */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-          Notas Adicionales
-        </h2>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Observaciones, condiciones de pago, etc."
-          rows={3}
-          className="input w-full resize-none"
-        />
-      </div>
-
-      {/* Signature */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-          Firma
-        </h2>
-
-        {signature ? (
-          <div className="relative">
-            <img
-              src={signature}
-              alt="Firma"
-              className="border rounded-lg max-h-32 mx-auto"
-              style={{ borderColor: 'var(--border-default)' }}
-            />
-            <button
-              onClick={handleRemoveSignature}
-              className="absolute top-2 right-2 p-1 rounded-full bg-red-500 text-white hover:bg-red-600"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        ) : (
-          <div
-            onClick={() => setShowSignaturePad(true)}
-            className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors hover:border-primary"
-            style={{ borderColor: 'var(--border-default)' }}
-          >
-            <p style={{ color: 'var(--text-muted)' }}>
-              Toca aquí para firmar
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Bottom Action Buttons (Mobile) */}
-      <div className="flex gap-3 pb-6 md:hidden">
-        <button className="btn-secondary flex-1 flex items-center justify-center gap-2 py-3">
-          <Printer size={20} />
-          Imprimir
-        </button>
+      {/* Sidebar Toggle Button - Fixed at left edge */}
+      {!isSidebarOpen && (
         <button
-          onClick={handleSave}
-          disabled={isLoading}
-          className="btn-primary flex-1 flex items-center justify-center gap-2 py-3"
+          onClick={() => setIsSidebarOpen(true)}
+          className="fixed left-0 top-20 z-20 p-2 rounded-r-lg shadow-md transition-colors hover:bg-opacity-80"
+          style={{
+            backgroundColor: 'var(--surface-card)',
+            borderColor: 'var(--border-default)',
+            borderWidth: '1px',
+            borderLeft: 'none',
+          }}
+          title="Mostrar plantillas"
         >
-          <Save size={20} />
-          {isLoading ? 'Guardando...' : 'Guardar'}
+          <ChevronRight size={20} />
         </button>
+      )}
+
+      {/* Main Page Content */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+            {/* Error Message */}
+            {error && (
+              <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 mb-4">
+                <p className="text-red-500">{error}</p>
+              </div>
+            )}
+
+            {/* Main Info Card - Receipt Info + Customer Info + Concept */}
+            <div className="card p-4 sm:p-6 mb-4">
+              {/* Receipt Header Row */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 pb-4 border-b" style={{ borderColor: 'var(--border-default)' }}>
+                <div className="flex items-center gap-3">
+                  <div
+                    className="px-4 py-2 rounded-lg font-mono text-lg font-bold"
+                    style={{
+                      backgroundColor: 'var(--color-primary-alpha)',
+                      color: 'var(--color-primary)',
+                    }}
+                  >
+                    {previewReceiptNumber}
+                  </div>
+                  <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                    {getCurrentDate()}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Total:</span>
+                  <span className="text-xl font-bold" style={{ color: 'var(--color-primary)' }}>
+                    {formatCurrency(total)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Customer Fields Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Customer Name */}
+                <div>
+                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    Nombre del Cliente *
+                  </label>
+                  <input
+                    type="text"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="Nombre completo o empresa"
+                    className="input w-full"
+                  />
+                </div>
+
+                {/* NIT */}
+                <div>
+                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                    NIT
+                  </label>
+                  <input
+                    type="text"
+                    value={customerNit}
+                    onChange={(e) => setCustomerNit(e.target.value)}
+                    placeholder="Ej: 12345678-9 o CF"
+                    className="input w-full"
+                  />
+                </div>
+
+                {/* Phone - conditional */}
+                {fieldVisibility.customer_phone && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                      Teléfono
+                    </label>
+                    <input
+                      type="tel"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      placeholder="Ej: 5555-1234"
+                      className="input w-full"
+                    />
+                  </div>
+                )}
+
+                {/* Email - conditional */}
+                {fieldVisibility.customer_email && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                      Correo Electrónico
+                    </label>
+                    <input
+                      type="email"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      placeholder="correo@ejemplo.com"
+                      className="input w-full"
+                    />
+                  </div>
+                )}
+
+                {/* Address - conditional */}
+                {fieldVisibility.customer_address && (
+                  <div className="sm:col-span-2 lg:col-span-1">
+                    <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                      Dirección
+                    </label>
+                    <input
+                      type="text"
+                      value={customerAddress}
+                      onChange={(e) => setCustomerAddress(e.target.value)}
+                      placeholder="Calle, zona, ciudad"
+                      className="input w-full"
+                    />
+                  </div>
+                )}
+
+                {/* Institution - conditional */}
+                {fieldVisibility.institution && (
+                  <div className="sm:col-span-2 lg:col-span-1">
+                    <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                      Institución
+                    </label>
+                    <input
+                      type="text"
+                      value={institution}
+                      onChange={(e) => setInstitution(e.target.value)}
+                      placeholder="Nombre de la empresa u organización"
+                      className="input w-full"
+                    />
+                  </div>
+                )}
+
+                {/* Concept - conditional - now in the same card */}
+                {fieldVisibility.concept && (
+                  <div className="sm:col-span-2 lg:col-span-3">
+                    <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                      Concepto
+                    </label>
+                    <input
+                      type="text"
+                      value={concept}
+                      onChange={(e) => setConcept(e.target.value)}
+                      placeholder="Descripción del motivo del recibo (ej: Compra de materiales, Pago de servicio)"
+                      className="input w-full"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Line Items - Toggleable (controlled by settings) */}
+            {(fieldVisibility.line_items ?? true) && (
+            <div className="card mb-4">
+              {/* Header - Always visible, clickable to toggle */}
+              <button
+                onClick={() => setShowLineItems(!showLineItems)}
+                className="w-full p-4 sm:p-6 flex items-center justify-between hover:bg-opacity-50 transition-colors rounded-t-lg"
+                style={{ backgroundColor: showLineItems ? 'transparent' : 'var(--surface-card)' }}
+              >
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Detalle del Recibo
+                  </h2>
+                  <span className="text-sm px-2 py-0.5 rounded-full" style={{
+                    backgroundColor: 'var(--surface-card-hover)',
+                    color: 'var(--text-muted)'
+                  }}>
+                    {lineItems.length} artículo{lineItems.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
+                    {formatCurrency(total)}
+                  </span>
+                  {showLineItems ? (
+                    <ChevronUp size={20} style={{ color: 'var(--text-muted)' }} />
+                  ) : (
+                    <ChevronDown size={20} style={{ color: 'var(--text-muted)' }} />
+                  )}
+                </div>
+              </button>
+
+              {/* Expandable Content */}
+              {showLineItems && (
+                <div className="px-4 sm:px-6 pb-4 sm:pb-6">
+                  {/* Add Line Button */}
+                  <div className="flex justify-end mb-4">
+                    <button
+                      onClick={addLineItem}
+                      className="btn-secondary flex items-center gap-2 text-sm"
+                    >
+                      <Plus size={16} />
+                      <span className="hidden sm:inline">Agregar Línea</span>
+                      <span className="sm:hidden">Agregar</span>
+                    </button>
+                  </div>
+
+                  {/* Header Row */}
+                  <div className="hidden md:grid md:grid-cols-12 gap-4 mb-2 text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
+                    <div className="col-span-6">Descripción</div>
+                    <div className="col-span-2 text-center">Cantidad</div>
+                    <div className="col-span-2 text-right">Precio Unit.</div>
+                    <div className="col-span-1 text-right">Total</div>
+                    <div className="col-span-1"></div>
+                  </div>
+
+                  {/* Line Items */}
+                  <div className="space-y-3">
+                    {lineItems.map((item) => (
+                      <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 p-3 rounded-lg" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+                        {/* Description */}
+                        <div className="md:col-span-6">
+                          <label className="block text-xs mb-1 md:hidden" style={{ color: 'var(--text-muted)' }}>Descripción</label>
+                          <input
+                            type="text"
+                            value={item.description}
+                            onChange={(e) => updateLineItem(item.id, 'description', e.target.value)}
+                            placeholder="Descripción del producto o servicio"
+                            className="input w-full"
+                          />
+                        </div>
+
+                        {/* Quantity */}
+                        <div className="md:col-span-2">
+                          <label className="block text-xs mb-1 md:hidden" style={{ color: 'var(--text-muted)' }}>Cantidad</label>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={item.quantity}
+                            onChange={(e) => updateLineItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+                            className="input w-full text-center"
+                          />
+                        </div>
+
+                        {/* Unit Price */}
+                        <div className="md:col-span-2">
+                          <label className="block text-xs mb-1 md:hidden" style={{ color: 'var(--text-muted)' }}>Precio Unitario</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.unitPrice}
+                            onChange={(e) => updateLineItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                            placeholder="0.00"
+                            className="input w-full text-right"
+                          />
+                        </div>
+
+                        {/* Line Total */}
+                        <div className="md:col-span-1 flex items-center justify-end">
+                          <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                            {formatCurrency(item.quantity * item.unitPrice)}
+                          </span>
+                        </div>
+
+                        {/* Delete Button */}
+                        <div className="md:col-span-1 flex items-center justify-end">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); removeLineItem(item.id); }}
+                            disabled={lineItems.length === 1}
+                            className="p-2 rounded-lg transition-colors hover:bg-red-500/10"
+                            style={{
+                              color: lineItems.length === 1 ? 'var(--text-muted)' : 'var(--color-danger)',
+                              cursor: lineItems.length === 1 ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Totals */}
+                  <div className="mt-6 pt-4 border-t" style={{ borderColor: 'var(--border-default)' }}>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="flex justify-between w-full md:w-64">
+                        <span style={{ color: 'var(--text-secondary)' }}>Subtotal:</span>
+                        <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                          {formatCurrency(subtotal)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between w-full md:w-64 text-xl font-bold">
+                        <span style={{ color: 'var(--text-primary)' }}>Total:</span>
+                        <span style={{ color: 'var(--color-primary)' }}>
+                          {formatCurrency(total)}
+                        </span>
+                      </div>
+
+                      {/* Live Amount in Words Preview - conditional */}
+                      {fieldVisibility.amount_in_words && total > 0 && (
+                        <div className="w-full md:w-auto mt-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+                          <div className="text-xs uppercase font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
+                            Cantidad en letras:
+                          </div>
+                          <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                            {amountInWords}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            )}
+
+            {/* Additional Info Card - Notes + Signature */}
+            {(fieldVisibility.notes || fieldVisibility.signature) && (
+              <div className="card p-4 sm:p-6 mb-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Notes - conditional */}
+                  {fieldVisibility.notes && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                        Notas Adicionales
+                      </label>
+                      <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Observaciones, condiciones de pago, etc."
+                        rows={3}
+                        className="input w-full resize-none"
+                      />
+                    </div>
+                  )}
+
+                  {/* Signature - conditional */}
+                  {fieldVisibility.signature && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                        Firma
+                      </label>
+                      {signature ? (
+                        <div className="relative inline-block">
+                          <img
+                            src={signature}
+                            alt="Firma"
+                            className="border rounded-lg max-h-24"
+                            style={{ borderColor: 'var(--border-default)' }}
+                          />
+                          <button
+                            onClick={handleRemoveSignature}
+                            className="absolute -top-2 -right-2 p-1 rounded-full bg-red-500 text-white hover:bg-red-600"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => setShowSignaturePad(true)}
+                          className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors hover:border-primary"
+                          style={{ borderColor: 'var(--border-default)' }}
+                        >
+                          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                            Toca aquí para firmar
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+      </div>{/* End Main Page Content */}
+
+      {/* Bottom Action Bar - Fixed at bottom */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-30 border-t"
+        style={{
+          backgroundColor: 'var(--surface-default)',
+          borderColor: 'var(--border-default)',
+        }}
+      >
+        {/* Gradient fade effect */}
+        <div
+          className="absolute -top-8 left-0 right-0 h-8 pointer-events-none"
+          style={{
+            background: 'linear-gradient(to bottom, transparent, var(--surface-default))'
+          }}
+        />
+        {/* Main bar */}
+        <div className="px-4 sm:px-6 py-3 sm:py-4">
+          <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            {/* Left side - Status & Payment Method */}
+            <div className="flex items-center gap-3">
+              {/* Status Selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium hidden sm:inline" style={{ color: 'var(--text-muted)' }}>Estado:</span>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as ReceiptStatus)}
+                  className="input py-1.5 px-2 text-sm min-w-[100px]"
+                  style={{ fontSize: '0.875rem' }}
+                >
+                  <option value="draft">{RECEIPT_STATUS_LABELS.draft}</option>
+                  <option value="completed">{RECEIPT_STATUS_LABELS.completed}</option>
+                  <option value="paid">{RECEIPT_STATUS_LABELS.paid}</option>
+                  <option value="cancelled">{RECEIPT_STATUS_LABELS.cancelled}</option>
+                </select>
+              </div>
+
+              {/* Payment Method Selector - conditional */}
+              {fieldVisibility.payment_method && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium hidden sm:inline" style={{ color: 'var(--text-muted)' }}>Pago:</span>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod | '')}
+                    className="input py-1.5 px-2 text-sm min-w-[110px]"
+                    style={{ fontSize: '0.875rem' }}
+                  >
+                    <option value="">-- Seleccionar --</option>
+                    <option value={PAYMENT_METHODS.cheque}>Cheque</option>
+                    <option value={PAYMENT_METHODS.transferencia}>Transferencia</option>
+                    <option value={PAYMENT_METHODS.efectivo}>Efectivo</option>
+                    <option value={PAYMENT_METHODS.otro}>Otro</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Loading indicator */}
+              {isLoading && (
+                <span className="text-sm hidden md:inline" style={{ color: 'var(--text-muted)' }}>
+                  Guardando...
+                </span>
+              )}
+            </div>
+
+            {/* Right side - Action Buttons */}
+            <div className="flex gap-2 sm:gap-3">
+              <button
+                onClick={() => navigate('/')}
+                className="btn-secondary flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4"
+              >
+                <X size={18} />
+                <span className="hidden sm:inline">Cancelar</span>
+              </button>
+              <button
+                className="btn-secondary flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4"
+                disabled
+              >
+                <Printer size={18} />
+                <span className="hidden sm:inline">Imprimir</span>
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isLoading}
+                className="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-6"
+              >
+                <Save size={18} />
+                <span>{isLoading ? 'Guardando...' : 'Guardar'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Signature Modal */}

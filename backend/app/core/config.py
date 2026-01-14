@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
 
+    # Email settings
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    admin_email: str = "admin@genesisone.app"
+    from_email: str = ""
+    from_name: str = "Custom Receipt Framework"
+
     class Config:
         env_file = ".env"
         extra = "allow"

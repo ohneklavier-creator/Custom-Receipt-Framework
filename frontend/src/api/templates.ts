@@ -20,6 +20,12 @@ export interface Template {
   description?: string;
   customer_name?: string;
   customer_nit?: string;
+  customer_phone?: string;
+  customer_email?: string;
+  customer_address?: string;
+  institution?: string;
+  concept?: string;
+  payment_method?: string;
   notes?: string;
   items?: TemplateItem[];
   user_id: number;
@@ -39,6 +45,12 @@ export interface TemplateCreate {
   description?: string;
   customer_name?: string;
   customer_nit?: string;
+  customer_phone?: string;
+  customer_email?: string;
+  customer_address?: string;
+  institution?: string;
+  concept?: string;
+  payment_method?: string;
   notes?: string;
   items?: TemplateItem[];
 }

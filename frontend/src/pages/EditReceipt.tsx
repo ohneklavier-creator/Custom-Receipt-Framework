@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { FileText, Plus, Trash2, Save, ArrowLeft, X, Check } from 'lucide-react';
 import SignaturePad from 'signature_pad';
-import { getReceipt, updateReceipt, Receipt, ReceiptStatus, RECEIPT_STATUS_LABELS } from '../api/receipts';
+import { getReceipt, updateReceipt, Receipt, ReceiptStatus, RECEIPT_STATUS_LABELS, PaymentMethod } from '../api/receipts';
+import { useFieldVisibility } from '../context/FieldVisibilityContext';
+import { numberToWordsSpanish } from '../utils/numberToWords';
 
 interface LineItem {
   id: number;
@@ -14,6 +16,7 @@ interface LineItem {
 export default function EditReceipt() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { fieldVisibility } = useFieldVisibility();
 
   // Loading state
   const [isLoadingReceipt, setIsLoadingReceipt] = useState(true);
@@ -25,6 +28,10 @@ export default function EditReceipt() {
   const [customerNit, setCustomerNit] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [institution, setInstitution] = useState('');
+  const [concept, setConcept] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
   const [status, setStatus] = useState<ReceiptStatus>('completed');
   const [notes, setNotes] = useState('');
   const [signature, setSignature] = useState<string | null>(null);
@@ -60,6 +67,10 @@ export default function EditReceipt() {
         setCustomerNit(data.customer_nit || '');
         setCustomerPhone(data.customer_phone || '');
         setCustomerEmail(data.customer_email || '');
+        setCustomerAddress(data.customer_address || '');
+        setInstitution(data.institution || '');
+        setConcept(data.concept || '');
+        setPaymentMethod((data.payment_method as PaymentMethod) || '');
         setStatus((data.status as ReceiptStatus) || 'completed');
         setNotes(data.notes || '');
         setSignature(data.signature || null);
@@ -88,6 +99,11 @@ export default function EditReceipt() {
   // Calculate totals
   const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
   const total = subtotal;
+
+  // Calculate amount in words live
+  const amountInWords = useMemo(() => {
+    return numberToWordsSpanish(total);
+  }, [total]);
 
   // Initialize signature pad when modal opens
   useEffect(() => {
@@ -199,6 +215,10 @@ export default function EditReceipt() {
         customer_nit: customerNit.trim() || undefined,
         customer_phone: customerPhone.trim() || undefined,
         customer_email: customerEmail.trim() || undefined,
+        customer_address: customerAddress.trim() || undefined,
+        institution: institution.trim() || undefined,
+        concept: concept.trim() || undefined,
+        payment_method: paymentMethod || undefined,
         status: status,
         notes: notes.trim() || undefined,
         signature: signature || undefined,
@@ -391,33 +411,69 @@ export default function EditReceipt() {
             />
           </div>
 
-          {/* Phone */}
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-              Teléfono
-            </label>
-            <input
-              type="tel"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="Ej: 5555-1234"
-              className="input w-full"
-            />
-          </div>
+          {/* Phone - conditional */}
+          {fieldVisibility.customer_phone && (
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                Teléfono
+              </label>
+              <input
+                type="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="Ej: 5555-1234"
+                className="input w-full"
+              />
+            </div>
+          )}
 
-          {/* Email */}
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-              Correo Electrónico
-            </label>
-            <input
-              type="email"
-              value={customerEmail}
-              onChange={(e) => setCustomerEmail(e.target.value)}
-              placeholder="correo@ejemplo.com"
-              className="input w-full"
-            />
-          </div>
+          {/* Email - conditional */}
+          {fieldVisibility.customer_email && (
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                Correo Electrónico
+              </label>
+              <input
+                type="email"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                placeholder="correo@ejemplo.com"
+                className="input w-full"
+              />
+            </div>
+          )}
+
+          {/* Address - conditional */}
+          {fieldVisibility.customer_address && (
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                Dirección
+              </label>
+              <input
+                type="text"
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                placeholder="Calle, zona, ciudad"
+                className="input w-full"
+              />
+            </div>
+          )}
+
+          {/* Institution - conditional */}
+          {fieldVisibility.institution && (
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                Institución
+              </label>
+              <input
+                type="text"
+                value={institution}
+                onChange={(e) => setInstitution(e.target.value)}
+                placeholder="Nombre de la empresa u organización"
+                className="input w-full"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -528,25 +584,76 @@ export default function EditReceipt() {
                 {formatCurrency(total)}
               </span>
             </div>
+
+            {/* Live Amount in Words Preview - conditional */}
+            {fieldVisibility.amount_in_words && total > 0 && (
+              <div className="w-full md:w-auto mt-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+                <div className="text-xs uppercase font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
+                  Cantidad en letras:
+                </div>
+                <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                  {amountInWords}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Notes */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-          Notas Adicionales
-        </h2>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Observaciones, condiciones de pago, etc."
-          rows={3}
-          className="input w-full resize-none"
-        />
-      </div>
+      {/* Concept - conditional */}
+      {fieldVisibility.concept && (
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Concepto
+          </h2>
+          <input
+            type="text"
+            value={concept}
+            onChange={(e) => setConcept(e.target.value)}
+            placeholder="Descripción del motivo del recibo (ej: Compra de materiales, Pago de servicio)"
+            className="input w-full"
+          />
+        </div>
+      )}
 
-      {/* Signature */}
+      {/* Payment Method - conditional */}
+      {fieldVisibility.payment_method && (
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Forma de Pago
+          </h2>
+          <select
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod | '')}
+            className="input w-full"
+          >
+            <option value="">-- Seleccionar forma de pago --</option>
+            <option value="Cheque">Cheque</option>
+            <option value="Transferencia">Transferencia</option>
+            <option value="Efectivo">Efectivo</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+      )}
+
+      {/* Notes - conditional */}
+      {fieldVisibility.notes && (
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Notas Adicionales
+          </h2>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Observaciones, condiciones de pago, etc."
+            rows={3}
+            className="input w-full resize-none"
+          />
+        </div>
+      )}
+
+      {/* Signature - conditional */}
+      {fieldVisibility.signature && (
       <div className="card p-6">
         <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
           Firma
@@ -579,6 +686,7 @@ export default function EditReceipt() {
           </div>
         )}
       </div>
+      )}
 
       {/* Bottom Action Buttons (Mobile) */}
       <div className="flex gap-3 pb-6 md:hidden">

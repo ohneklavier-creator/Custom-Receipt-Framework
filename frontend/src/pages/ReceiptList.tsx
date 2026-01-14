@@ -4,8 +4,10 @@ import { FileText, Eye, Printer, RefreshCw, Calendar, X } from 'lucide-react';
 import { getReceipts, getReceipt, ReceiptListItem, ReceiptFilters, ReceiptStatus, RECEIPT_STATUS_LABELS, RECEIPT_STATUS_COLORS } from '../api/receipts';
 import { printReceipt } from '../components/ReceiptPrint';
 import { getCompanySettings } from './Settings';
+import { useFieldVisibility } from '../context/FieldVisibilityContext';
 
 export default function ReceiptList() {
+  const { fieldVisibility } = useFieldVisibility();
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -86,7 +88,7 @@ export default function ReceiptList() {
     try {
       const fullReceipt = await getReceipt(receiptId);
       const { companyName, companyInfo } = getCompanySettings();
-      printReceipt(fullReceipt, companyName, companyInfo);
+      printReceipt(fullReceipt, companyName, companyInfo, fieldVisibility);
     } catch (err) {
       console.error('Error printing receipt:', err);
       alert('Error al cargar el recibo para imprimir');

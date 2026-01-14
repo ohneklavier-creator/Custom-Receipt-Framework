@@ -2,6 +2,7 @@ import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { FileText, Search, Settings as SettingsIcon, Plus, LogOut, User } from 'lucide-react';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { FieldVisibilityProvider } from './context/FieldVisibilityContext';
 import Settings from './pages/Settings';
 import CreateReceipt from './pages/CreateReceipt';
 import ReceiptList from './pages/ReceiptList';
@@ -133,7 +134,9 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppContent />
+        <FieldVisibilityProvider>
+          <AppContent />
+        </FieldVisibilityProvider>
       </AuthProvider>
     </ThemeProvider>
   );

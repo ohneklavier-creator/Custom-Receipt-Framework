@@ -29,9 +29,10 @@ async def health():
 
 
 # API routes
-from app.api.v1 import receipts, auth, backup, templates
+from app.api.v1 import receipts, auth, backup, templates, settings as settings_router
 
 app.include_router(receipts.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(backup.router, prefix="/api/v1")
 app.include_router(templates.router, prefix="/api/v1")
+app.include_router(settings_router.router, prefix="/api/v1")

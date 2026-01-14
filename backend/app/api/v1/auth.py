@@ -22,6 +22,7 @@ from app.services.auth_service import (
     get_user_by_username,
     update_user,
 )
+from app.services.email_service import email_service
 
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
@@ -51,6 +52,10 @@ async def register(
 
     # Create user
     user = await create_user(session, user_data)
+
+    # Send email notification to admin
+    await email_service.send_registration_notification(user_data.email, user_data.username)
+
     return user
 
 

@@ -48,6 +48,7 @@ class Receipt(Base, TimestampMixin):
     customer_nit: Mapped[Optional[str]] = mapped_column(String(50), index=True)
     customer_phone: Mapped[Optional[str]] = mapped_column(String(50))
     customer_email: Mapped[Optional[str]] = mapped_column(String(255))
+    customer_address: Mapped[Optional[str]] = mapped_column(String(500))
 
     # Receipt details
     date: Mapped[date] = mapped_column(
@@ -64,6 +65,11 @@ class Receipt(Base, TimestampMixin):
     )
     notes: Mapped[Optional[str]] = mapped_column(Text)
     signature: Mapped[Optional[str]] = mapped_column(Text)  # Base64 encoded
+
+    # Additional receipt fields
+    institution: Mapped[Optional[str]] = mapped_column(String(255))
+    concept: Mapped[Optional[str]] = mapped_column(String(500))
+    payment_method: Mapped[Optional[str]] = mapped_column(String(50))
 
     # Calculated totals
     subtotal: Mapped[Decimal] = mapped_column(
