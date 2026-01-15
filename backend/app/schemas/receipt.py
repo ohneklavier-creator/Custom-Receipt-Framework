@@ -47,7 +47,7 @@ class ReceiptItemResponse(ReceiptItemBase):
 # Receipt Schemas
 class ReceiptBase(BaseModel):
     """Base schema for receipts"""
-    customer_name: str = Field(..., min_length=1, max_length=255)
+    customer_name: Optional[str] = Field(None, max_length=255)  # Now optional for institution-only receipts
     customer_nit: Optional[str] = Field(None, max_length=50)
     customer_phone: Optional[str] = Field(None, max_length=50)
     customer_email: Optional[EmailStr] = None
@@ -55,9 +55,12 @@ class ReceiptBase(BaseModel):
     date: Optional[date] = None
     notes: Optional[str] = None
     signature: Optional[str] = None  # Base64 encoded image
+    received_by_name: Optional[str] = Field(None, max_length=255)  # Name below signature
     institution: Optional[str] = Field(None, max_length=255)
     concept: Optional[str] = Field(None, max_length=500)
     payment_method: Optional[str] = Field(None, max_length=50)
+    check_number: Optional[str] = Field(None, max_length=50)  # Check number for Cheque payments
+    bank_account: Optional[str] = Field(None, max_length=100)  # Bank account for Transferencia payments
     custom_fields: Optional[dict] = None
 
     @field_validator('payment_method')
@@ -83,7 +86,7 @@ class ReceiptCreate(ReceiptBase):
 
 class ReceiptUpdate(BaseModel):
     """Schema for updating receipts"""
-    customer_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    customer_name: Optional[str] = Field(None, max_length=255)  # Optional for institution-only receipts
     customer_nit: Optional[str] = Field(None, max_length=50)
     customer_phone: Optional[str] = Field(None, max_length=50)
     customer_email: Optional[EmailStr] = None
@@ -92,9 +95,12 @@ class ReceiptUpdate(BaseModel):
     status: Optional[ReceiptStatus] = None
     notes: Optional[str] = None
     signature: Optional[str] = None
+    received_by_name: Optional[str] = Field(None, max_length=255)  # Name below signature
     institution: Optional[str] = Field(None, max_length=255)
     concept: Optional[str] = Field(None, max_length=500)
     payment_method: Optional[str] = Field(None, max_length=50)
+    check_number: Optional[str] = Field(None, max_length=50)  # Check number for Cheque payments
+    bank_account: Optional[str] = Field(None, max_length=100)  # Bank account for Transferencia payments
     custom_fields: Optional[dict] = None
     items: Optional[List[ReceiptItemCreate]] = None
 
@@ -110,7 +116,7 @@ class ReceiptResponse(BaseModel):
     """Schema for receipt responses"""
     id: int
     receipt_number: str
-    customer_name: str
+    customer_name: Optional[str] = None  # Optional for institution-only receipts
     customer_nit: Optional[str] = None
     customer_phone: Optional[str] = None
     customer_email: Optional[EmailStr] = None
@@ -119,9 +125,12 @@ class ReceiptResponse(BaseModel):
     status: ReceiptStatus
     notes: Optional[str] = None
     signature: Optional[str] = None
+    received_by_name: Optional[str] = None  # Name below signature
     institution: Optional[str] = None
     concept: Optional[str] = None
     payment_method: Optional[str] = None
+    check_number: Optional[str] = None  # Check number for Cheque payments
+    bank_account: Optional[str] = None  # Bank account for Transferencia payments
     custom_fields: Optional[dict] = None
     subtotal: Decimal
     total: Decimal
@@ -136,7 +145,7 @@ class ReceiptListResponse(BaseModel):
     """Schema for receipt list responses (without items)"""
     id: int
     receipt_number: str
-    customer_name: str
+    customer_name: Optional[str] = None  # Optional for institution-only receipts
     customer_nit: Optional[str] = None
     date: date
     status: ReceiptStatus

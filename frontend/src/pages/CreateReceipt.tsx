@@ -2,10 +2,12 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Plus, Trash2, Save, Printer, X, Check, FileStack, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import SignaturePad from 'signature_pad';
-import { createReceipt, ReceiptStatus, RECEIPT_STATUS_LABELS, PAYMENT_METHODS, PaymentMethod } from '../api/receipts';
+import { createReceipt, ReceiptStatus, RECEIPT_STATUS_LABELS, PAYMENT_METHODS, PaymentMethod, Receipt } from '../api/receipts';
+import { printReceipt } from '../components/ReceiptPrint';
 import { getTemplates, getTemplate, createTemplate, TemplateListItem } from '../api/templates';
 import { useFieldVisibility } from '../context/FieldVisibilityContext';
 import { numberToWordsSpanish } from '../utils/numberToWords';
+import { getCompanySettings } from './Settings';
 
 interface LineItem {
   id: number;
@@ -26,10 +28,13 @@ export default function CreateReceipt() {
   const [customerAddress, setCustomerAddress] = useState('');
   const [institution, setInstitution] = useState('');
   const [concept, setConcept] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('Efectivo');  // Default to cash
+  const [checkNumber, setCheckNumber] = useState('');  // Check number for Cheque payments
+  const [bankAccount, setBankAccount] = useState('');  // Bank account for Transferencia payments
   const [status, setStatus] = useState<ReceiptStatus>('completed');
   const [notes, setNotes] = useState('');
   const [signature, setSignature] = useState<string | null>(null);
+  const [receivedByName, setReceivedByName] = useState('');  // Name below signature
 
   // UI state
   const [isLoading, setIsLoading] = useState(false);
@@ -89,6 +94,8 @@ export default function CreateReceipt() {
       signaturePadRef.current = new SignaturePad(canvas, {
         backgroundColor: 'rgb(255, 255, 255)',
         penColor: 'rgb(0, 0, 0)',
+        minWidth: 2,
+        maxWidth: 4,
       });
 
       window.addEventListener('resize', resizeCanvas);
@@ -180,7 +187,9 @@ export default function CreateReceipt() {
         customer_phone: customerPhone.trim() || undefined,
         customer_email: customerEmail.trim() || undefined,
         customer_address: customerAddress.trim() || undefined,
-        institution: institution.trim() || undefined,
+        institution: (fieldVisibility.institution_use_company_name ?? false)
+          ? getCompanySettings().companyName
+          : (institution.trim() || undefined),
         concept: concept.trim() || undefined,
         payment_method: paymentMethod || undefined,
         notes: notes.trim() || undefined,
@@ -264,10 +273,10 @@ export default function CreateReceipt() {
     setSignature(null);
   };
 
-  // Handle form submission
-  const handleSave = async () => {
-    // Validate required fields
-    if (!customerName.trim()) {
+  // Handle save and print - saves first, then prints
+  const handleSaveAndPrint = async () => {
+    // Validate required fields - customer name only required if field is visible
+    if ((fieldVisibility.customer_name ?? true) && !customerName.trim()) {
       setError('El nombre del cliente es requerido');
       return;
     }
@@ -283,17 +292,81 @@ export default function CreateReceipt() {
 
     try {
       const receiptData = {
-        customer_name: customerName.trim(),
+        customer_name: customerName.trim() || undefined,
         customer_nit: customerNit.trim() || undefined,
         customer_phone: customerPhone.trim() || undefined,
         customer_email: customerEmail.trim() || undefined,
         customer_address: customerAddress.trim() || undefined,
-        institution: institution.trim() || undefined,
+        institution: (fieldVisibility.institution_use_company_name ?? false)
+          ? getCompanySettings().companyName
+          : (institution.trim() || undefined),
         concept: concept.trim() || undefined,
         payment_method: paymentMethod || undefined,
+        check_number: paymentMethod === 'Cheque' ? (checkNumber.trim() || undefined) : undefined,
+        bank_account: paymentMethod === 'Transferencia' ? (bankAccount.trim() || undefined) : undefined,
         status: status,
         notes: notes.trim() || undefined,
         signature: signature || undefined,
+        received_by_name: receivedByName.trim() || undefined,
+        items: validItems.map(item => ({
+          description: item.description.trim(),
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+        })),
+      };
+
+      const result = await createReceipt(receiptData);
+
+      // Print the saved receipt
+      const { companyName: cName, companyInfo, receiptTitle } = getCompanySettings();
+      printReceipt(result, cName, companyInfo, fieldVisibility, receiptTitle);
+
+      // Navigate to receipt list
+      alert(`Recibo ${result.receipt_number} guardado e impreso!`);
+      navigate('/');
+    } catch (err) {
+      console.error('Error creating receipt:', err);
+      setError('Error al guardar el recibo. Por favor intente de nuevo.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle form submission
+  const handleSave = async () => {
+    // Validate required fields - customer name only required if field is visible
+    if ((fieldVisibility.customer_name ?? true) && !customerName.trim()) {
+      setError('El nombre del cliente es requerido');
+      return;
+    }
+
+    const validItems = lineItems.filter(item => item.description.trim() !== '');
+    if (validItems.length === 0) {
+      setError('Debe agregar al menos un artículo con descripción');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const receiptData = {
+        customer_name: customerName.trim() || undefined,
+        customer_nit: customerNit.trim() || undefined,
+        customer_phone: customerPhone.trim() || undefined,
+        customer_email: customerEmail.trim() || undefined,
+        customer_address: customerAddress.trim() || undefined,
+        institution: (fieldVisibility.institution_use_company_name ?? false)
+          ? getCompanySettings().companyName
+          : (institution.trim() || undefined),
+        concept: concept.trim() || undefined,
+        payment_method: paymentMethod || undefined,
+        check_number: paymentMethod === 'Cheque' ? (checkNumber.trim() || undefined) : undefined,
+        bank_account: paymentMethod === 'Transferencia' ? (bankAccount.trim() || undefined) : undefined,
+        status: status,
+        notes: notes.trim() || undefined,
+        signature: signature || undefined,
+        received_by_name: receivedByName.trim() || undefined,
         items: validItems.map(item => ({
           description: item.description.trim(),
           quantity: item.quantity,
@@ -463,45 +536,33 @@ export default function CreateReceipt() {
 
               {/* Customer Fields Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Customer Name */}
-                <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                    Nombre del Cliente *
-                  </label>
-                  <input
-                    type="text"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Nombre completo o empresa"
-                    className="input w-full"
-                  />
-                </div>
-
-                {/* NIT */}
-                <div>
-                  <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                    NIT
-                  </label>
-                  <input
-                    type="text"
-                    value={customerNit}
-                    onChange={(e) => setCustomerNit(e.target.value)}
-                    placeholder="Ej: 12345678-9 o CF"
-                    className="input w-full"
-                  />
-                </div>
-
-                {/* Phone - conditional */}
-                {fieldVisibility.customer_phone && (
+                {/* Customer Name - conditional */}
+                {(fieldVisibility.customer_name ?? true) && (
                   <div>
                     <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                      Teléfono
+                      Nombre del Cliente *
                     </label>
                     <input
-                      type="tel"
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      placeholder="Ej: 5555-1234"
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Nombre completo o empresa"
+                      className="input w-full"
+                    />
+                  </div>
+                )}
+
+                {/* NIT - conditional */}
+                {(fieldVisibility.customer_nit ?? true) && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                      NIT
+                    </label>
+                    <input
+                      type="text"
+                      value={customerNit}
+                      onChange={(e) => setCustomerNit(e.target.value)}
+                      placeholder="Ej: 12345678-9 o CF"
                       className="input w-full"
                     />
                   </div>
@@ -544,14 +605,27 @@ export default function CreateReceipt() {
                   <div className="sm:col-span-2 lg:col-span-1">
                     <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
                       Institución
+                      {(fieldVisibility.institution_use_company_name ?? false) && (
+                        <span className="text-xs ml-2" style={{ color: 'var(--text-muted)' }}>(auto)</span>
+                      )}
                     </label>
-                    <input
-                      type="text"
-                      value={institution}
-                      onChange={(e) => setInstitution(e.target.value)}
-                      placeholder="Nombre de la empresa u organización"
-                      className="input w-full"
-                    />
+                    {(fieldVisibility.institution_use_company_name ?? false) ? (
+                      <input
+                        type="text"
+                        value={getCompanySettings().companyName}
+                        disabled
+                        className="input w-full opacity-60 cursor-not-allowed"
+                        title="Auto-rellenado desde configuración"
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        value={institution}
+                        onChange={(e) => setInstitution(e.target.value)}
+                        placeholder="Nombre de la empresa u organización"
+                        className="input w-full"
+                      />
+                    )}
                   </div>
                 )}
 
@@ -608,18 +682,6 @@ export default function CreateReceipt() {
               {/* Expandable Content */}
               {showLineItems && (
                 <div className="px-4 sm:px-6 pb-4 sm:pb-6">
-                  {/* Add Line Button */}
-                  <div className="flex justify-end mb-4">
-                    <button
-                      onClick={addLineItem}
-                      className="btn-secondary flex items-center gap-2 text-sm"
-                    >
-                      <Plus size={16} />
-                      <span className="hidden sm:inline">Agregar Línea</span>
-                      <span className="sm:hidden">Agregar</span>
-                    </button>
-                  </div>
-
                   {/* Header Row */}
                   <div className="hidden md:grid md:grid-cols-12 gap-4 mb-2 text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
                     <div className="col-span-6">Descripción</div>
@@ -697,6 +759,18 @@ export default function CreateReceipt() {
                     ))}
                   </div>
 
+                  {/* Add Line Button - Below items */}
+                  <div className="flex justify-center mt-4">
+                    <button
+                      onClick={addLineItem}
+                      className="btn-secondary flex items-center gap-2 text-sm"
+                    >
+                      <Plus size={16} />
+                      <span className="hidden sm:inline">Agregar Línea</span>
+                      <span className="sm:hidden">Agregar</span>
+                    </button>
+                  </div>
+
                   {/* Totals */}
                   <div className="mt-6 pt-4 border-t" style={{ borderColor: 'var(--border-default)' }}>
                     <div className="flex flex-col items-end gap-2">
@@ -731,39 +805,39 @@ export default function CreateReceipt() {
             </div>
             )}
 
-            {/* Additional Info Card - Notes + Signature */}
-            {(fieldVisibility.notes || fieldVisibility.signature) && (
+            {/* Additional Info Card - Notes + Name + Phone + Signature */}
+            {(fieldVisibility.notes || fieldVisibility.signature || (fieldVisibility.received_by_name ?? true) || fieldVisibility.customer_phone) && (
               <div className="card p-4 sm:p-6 mb-4">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Notes - conditional */}
-                  {fieldVisibility.notes && (
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                        Notas Adicionales
-                      </label>
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Observaciones, condiciones de pago, etc."
-                        rows={3}
-                        className="input w-full resize-none"
-                      />
-                    </div>
-                  )}
+                {/* Notes - conditional */}
+                {fieldVisibility.notes && (
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                      Notas Adicionales
+                    </label>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Observaciones, condiciones de pago, etc."
+                      rows={3}
+                      className="input w-full resize-none"
+                    />
+                  </div>
+                )}
 
-                  {/* Signature - conditional */}
-                  {fieldVisibility.signature && (
-                    <div>
-                      <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-                        Firma
+                {/* Signature Section - Left aligned */}
+                {fieldVisibility.signature && (
+                  <div className="mb-6">
+                    <div className="flex items-center gap-4">
+                      <label className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                        Firma:
                       </label>
                       {signature ? (
                         <div className="relative inline-block">
                           <img
                             src={signature}
                             alt="Firma"
-                            className="border rounded-lg max-h-24"
-                            style={{ borderColor: 'var(--border-default)' }}
+                            className="border rounded-lg"
+                            style={{ borderColor: 'var(--border-default)', maxHeight: '80px' }}
                           />
                           <button
                             onClick={handleRemoveSignature}
@@ -775,8 +849,8 @@ export default function CreateReceipt() {
                       ) : (
                         <div
                           onClick={() => setShowSignaturePad(true)}
-                          className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors hover:border-primary"
-                          style={{ borderColor: 'var(--border-default)' }}
+                          className="border-2 border-dashed rounded-lg px-8 py-4 text-center cursor-pointer transition-colors hover:border-primary"
+                          style={{ borderColor: 'var(--border-default)', minWidth: '200px' }}
                         >
                           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
                             Toca aquí para firmar
@@ -784,8 +858,45 @@ export default function CreateReceipt() {
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+
+                {/* Name and Phone Row - Below Signature */}
+                {((fieldVisibility.received_by_name ?? true) || fieldVisibility.customer_phone) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Received By Name - conditional */}
+                    {(fieldVisibility.received_by_name ?? true) && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                          Nombre
+                        </label>
+                        <input
+                          type="text"
+                          value={receivedByName}
+                          onChange={(e) => setReceivedByName(e.target.value)}
+                          placeholder="Nombre de quien recibe"
+                          className="input w-full"
+                        />
+                      </div>
+                    )}
+
+                    {/* Phone - conditional - moved here below name */}
+                    {fieldVisibility.customer_phone && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+                          Teléfono
+                        </label>
+                        <input
+                          type="tel"
+                          value={customerPhone}
+                          onChange={(e) => setCustomerPhone(e.target.value)}
+                          placeholder="Ej: 5555-1234"
+                          className="input w-full"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -833,16 +944,43 @@ export default function CreateReceipt() {
                   <span className="text-xs font-medium hidden sm:inline" style={{ color: 'var(--text-muted)' }}>Pago:</span>
                   <select
                     value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod | '')}
+                    onChange={(e) => {
+                      setPaymentMethod(e.target.value as PaymentMethod | '');
+                      // Clear payment detail fields when changing method
+                      setCheckNumber('');
+                      setBankAccount('');
+                    }}
                     className="input py-1.5 px-2 text-sm min-w-[110px]"
                     style={{ fontSize: '0.875rem' }}
                   >
                     <option value="">-- Seleccionar --</option>
+                    <option value={PAYMENT_METHODS.efectivo}>Efectivo</option>
                     <option value={PAYMENT_METHODS.cheque}>Cheque</option>
                     <option value={PAYMENT_METHODS.transferencia}>Transferencia</option>
-                    <option value={PAYMENT_METHODS.efectivo}>Efectivo</option>
                     <option value={PAYMENT_METHODS.otro}>Otro</option>
                   </select>
+                  {/* Check Number field - shown when Cheque is selected */}
+                  {paymentMethod === 'Cheque' && (
+                    <input
+                      type="text"
+                      value={checkNumber}
+                      onChange={(e) => setCheckNumber(e.target.value)}
+                      placeholder="No. Cheque"
+                      className="input py-1.5 px-2 text-sm w-28"
+                      style={{ fontSize: '0.875rem' }}
+                    />
+                  )}
+                  {/* Bank Account field - shown when Transferencia is selected */}
+                  {paymentMethod === 'Transferencia' && (
+                    <input
+                      type="text"
+                      value={bankAccount}
+                      onChange={(e) => setBankAccount(e.target.value)}
+                      placeholder="No. Cuenta"
+                      className="input py-1.5 px-2 text-sm w-32"
+                      style={{ fontSize: '0.875rem' }}
+                    />
+                  )}
                 </div>
               )}
 
@@ -864,8 +1002,9 @@ export default function CreateReceipt() {
                 <span className="hidden sm:inline">Cancelar</span>
               </button>
               <button
+                onClick={handleSaveAndPrint}
+                disabled={isLoading}
                 className="btn-secondary flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4"
-                disabled
               >
                 <Printer size={18} />
                 <span className="hidden sm:inline">Imprimir</span>

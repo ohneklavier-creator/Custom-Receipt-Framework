@@ -60,10 +60,17 @@ async def create_receipt(session: AsyncSession, receipt_data: ReceiptCreate) -> 
         customer_nit=receipt_data.customer_nit,
         customer_phone=receipt_data.customer_phone,
         customer_email=receipt_data.customer_email,
+        customer_address=receipt_data.customer_address,
         date=receipt_data.date,
         status=receipt_data.status or ReceiptStatus.COMPLETED,
         notes=receipt_data.notes,
         signature=receipt_data.signature,
+        received_by_name=receipt_data.received_by_name,
+        institution=receipt_data.institution,
+        concept=receipt_data.concept,
+        payment_method=receipt_data.payment_method,
+        check_number=receipt_data.check_number,
+        bank_account=receipt_data.bank_account,
         custom_fields=receipt_data.custom_fields,
     )
 
@@ -192,6 +199,8 @@ async def update_receipt(
         receipt.customer_phone = receipt_data.customer_phone
     if receipt_data.customer_email is not None:
         receipt.customer_email = receipt_data.customer_email
+    if receipt_data.customer_address is not None:
+        receipt.customer_address = receipt_data.customer_address
     if receipt_data.date is not None:
         receipt.date = receipt_data.date
     if receipt_data.status is not None:
@@ -200,6 +209,18 @@ async def update_receipt(
         receipt.notes = receipt_data.notes
     if receipt_data.signature is not None:
         receipt.signature = receipt_data.signature
+    if receipt_data.received_by_name is not None:
+        receipt.received_by_name = receipt_data.received_by_name
+    if receipt_data.institution is not None:
+        receipt.institution = receipt_data.institution
+    if receipt_data.concept is not None:
+        receipt.concept = receipt_data.concept
+    if receipt_data.payment_method is not None:
+        receipt.payment_method = receipt_data.payment_method
+    if receipt_data.check_number is not None:
+        receipt.check_number = receipt_data.check_number
+    if receipt_data.bank_account is not None:
+        receipt.bank_account = receipt_data.bank_account
     if receipt_data.custom_fields is not None:
         receipt.custom_fields = receipt_data.custom_fields
 

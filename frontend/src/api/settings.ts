@@ -55,6 +55,8 @@ api.interceptors.response.use(
 );
 
 export interface FieldVisibilitySettings {
+  customer_name: boolean;  // Toggle customer name field
+  customer_nit: boolean;
   customer_address: boolean;
   customer_phone: boolean;
   customer_email: boolean;
@@ -64,20 +66,29 @@ export interface FieldVisibilitySettings {
   payment_method: boolean;
   notes: boolean;
   signature: boolean;
+  received_by_name: boolean;  // Toggle NOMBRE field below signature
+  authorized_signature: boolean;  // Toggle authorized signature box in print
+  payment_method_in_print: boolean;  // Toggle payment method display in print footer
   line_items: boolean;  // Controls line items section in form
   line_items_in_print: boolean;  // Controls line items table in print
+  // Print header controls
+  show_company_name_in_header: boolean;  // Toggle company name in print header
+  show_company_info_in_header: boolean;  // Toggle company info in print header
+  institution_use_company_name: boolean;  // Auto-fill institution with company name
 }
 
 export interface Settings {
   id: number;
   company_name?: string;
   company_info?: string;
+  receipt_title?: string;  // Custom title like "RECIBO DE PAGO"
   field_visibility?: FieldVisibilitySettings;
 }
 
 export interface SettingsUpdate {
   company_name?: string;
   company_info?: string;
+  receipt_title?: string;  // Custom title like "RECIBO DE PAGO"
   field_visibility?: FieldVisibilitySettings;
 }
 

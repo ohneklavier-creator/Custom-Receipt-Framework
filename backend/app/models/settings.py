@@ -15,6 +15,7 @@ class Settings(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     company_name: Mapped[Optional[str]] = mapped_column(String(255))
     company_info: Mapped[Optional[str]] = mapped_column(String(500))
+    receipt_title: Mapped[Optional[str]] = mapped_column(String(100))  # Custom title like "RECIBO DE PAGO"
     field_visibility: Mapped[Optional[dict]] = mapped_column(JSONB)
 
     created_at: Mapped[datetime] = mapped_column(

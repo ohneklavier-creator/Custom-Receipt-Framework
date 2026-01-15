@@ -5,6 +5,7 @@ import SignaturePad from 'signature_pad';
 import { getReceipt, updateReceipt, Receipt, ReceiptStatus, RECEIPT_STATUS_LABELS, PaymentMethod } from '../api/receipts';
 import { useFieldVisibility } from '../context/FieldVisibilityContext';
 import { numberToWordsSpanish } from '../utils/numberToWords';
+import { getCompanySettings } from './Settings';
 
 interface LineItem {
   id: number;
@@ -32,9 +33,12 @@ export default function EditReceipt() {
   const [institution, setInstitution] = useState('');
   const [concept, setConcept] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>('');
+  const [checkNumber, setCheckNumber] = useState('');  // Check number for Cheque payments
+  const [bankAccount, setBankAccount] = useState('');  // Bank account for Transferencia payments
   const [status, setStatus] = useState<ReceiptStatus>('completed');
   const [notes, setNotes] = useState('');
   const [signature, setSignature] = useState<string | null>(null);
+  const [receivedByName, setReceivedByName] = useState('');  // Name below signature
   const [receiptDate, setReceiptDate] = useState('');
 
   // UI state
@@ -63,7 +67,7 @@ export default function EditReceipt() {
 
         // Populate form fields
         setReceiptNumber(data.receipt_number);
-        setCustomerName(data.customer_name);
+        setCustomerName(data.customer_name || '');
         setCustomerNit(data.customer_nit || '');
         setCustomerPhone(data.customer_phone || '');
         setCustomerEmail(data.customer_email || '');
@@ -71,9 +75,12 @@ export default function EditReceipt() {
         setInstitution(data.institution || '');
         setConcept(data.concept || '');
         setPaymentMethod((data.payment_method as PaymentMethod) || '');
+        setCheckNumber(data.check_number || '');
+        setBankAccount(data.bank_account || '');
         setStatus((data.status as ReceiptStatus) || 'completed');
         setNotes(data.notes || '');
         setSignature(data.signature || null);
+        setReceivedByName(data.received_by_name || '');
         setReceiptDate(data.date);
 
         // Populate line items
@@ -127,6 +134,8 @@ export default function EditReceipt() {
       signaturePadRef.current = new SignaturePad(canvas, {
         backgroundColor: 'rgb(255, 255, 255)',
         penColor: 'rgb(0, 0, 0)',
+        minWidth: 2,
+        maxWidth: 4,
       });
 
       window.addEventListener('resize', resizeCanvas);
@@ -194,8 +203,8 @@ export default function EditReceipt() {
   const handleSave = async () => {
     if (!id || !originalReceipt) return;
 
-    // Validate required fields
-    if (!customerName.trim()) {
+    // Validate required fields - customer name only required if field is visible
+    if ((fieldVisibility.customer_name ?? true) && !customerName.trim()) {
       setError('El nombre del cliente es requerido');
       return;
     }
@@ -211,17 +220,22 @@ export default function EditReceipt() {
 
     try {
       const receiptData = {
-        customer_name: customerName.trim(),
-        customer_nit: customerNit.trim() || undefined,
-        customer_phone: customerPhone.trim() || undefined,
-        customer_email: customerEmail.trim() || undefined,
-        customer_address: customerAddress.trim() || undefined,
-        institution: institution.trim() || undefined,
-        concept: concept.trim() || undefined,
+        customer_name: customerName?.trim() || undefined,
+        customer_nit: customerNit?.trim() || undefined,
+        customer_phone: customerPhone?.trim() || undefined,
+        customer_email: customerEmail?.trim() || undefined,
+        customer_address: customerAddress?.trim() || undefined,
+        institution: (fieldVisibility.institution_use_company_name ?? false)
+          ? getCompanySettings().companyName
+          : (institution?.trim() || undefined),
+        concept: concept?.trim() || undefined,
         payment_method: paymentMethod || undefined,
+        check_number: paymentMethod === 'Cheque' ? (checkNumber?.trim() || undefined) : undefined,
+        bank_account: paymentMethod === 'Transferencia' ? (bankAccount?.trim() || undefined) : undefined,
         status: status,
-        notes: notes.trim() || undefined,
+        notes: notes?.trim() || undefined,
         signature: signature || undefined,
+        received_by_name: receivedByName?.trim() || undefined,
         items: validItems.map(item => ({
           description: item.description.trim(),
           quantity: item.quantity,
@@ -383,45 +397,33 @@ export default function EditReceipt() {
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Customer Name */}
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-              Nombre del Cliente *
-            </label>
-            <input
-              type="text"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Nombre completo o empresa"
-              className="input w-full"
-            />
-          </div>
-
-          {/* NIT */}
-          <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-              NIT
-            </label>
-            <input
-              type="text"
-              value={customerNit}
-              onChange={(e) => setCustomerNit(e.target.value)}
-              placeholder="Ej: 12345678-9 o CF"
-              className="input w-full"
-            />
-          </div>
-
-          {/* Phone - conditional */}
-          {fieldVisibility.customer_phone && (
+          {/* Customer Name - conditional */}
+          {(fieldVisibility.customer_name ?? true) && (
             <div>
               <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
-                Teléfono
+                Nombre del Cliente *
               </label>
               <input
-                type="tel"
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                placeholder="Ej: 5555-1234"
+                type="text"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Nombre completo o empresa"
+                className="input w-full"
+              />
+            </div>
+          )}
+
+          {/* NIT - conditional */}
+          {(fieldVisibility.customer_nit ?? true) && (
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                NIT
+              </label>
+              <input
+                type="text"
+                value={customerNit}
+                onChange={(e) => setCustomerNit(e.target.value)}
+                placeholder="Ej: 12345678-9 o CF"
                 className="input w-full"
               />
             </div>
@@ -464,14 +466,27 @@ export default function EditReceipt() {
             <div className="md:col-span-2">
               <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                 Institución
+                {(fieldVisibility.institution_use_company_name ?? false) && (
+                  <span className="text-xs ml-2" style={{ color: 'var(--text-muted)' }}>(auto)</span>
+                )}
               </label>
-              <input
-                type="text"
-                value={institution}
-                onChange={(e) => setInstitution(e.target.value)}
-                placeholder="Nombre de la empresa u organización"
-                className="input w-full"
-              />
+              {(fieldVisibility.institution_use_company_name ?? false) ? (
+                <input
+                  type="text"
+                  value={getCompanySettings().companyName}
+                  disabled
+                  className="input w-full opacity-60 cursor-not-allowed"
+                  title="Auto-rellenado desde configuración"
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={institution}
+                  onChange={(e) => setInstitution(e.target.value)}
+                  placeholder="Nombre de la empresa u organización"
+                  className="input w-full"
+                />
+              )}
             </div>
           )}
         </div>
@@ -479,18 +494,9 @@ export default function EditReceipt() {
 
       {/* Line Items */}
       <div className="card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Detalle del Recibo
-          </h2>
-          <button
-            onClick={addLineItem}
-            className="btn-secondary flex items-center gap-2 text-sm"
-          >
-            <Plus size={16} />
-            Agregar Línea
-          </button>
-        </div>
+        <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+          Detalle del Recibo
+        </h2>
 
         {/* Header Row */}
         <div className="hidden md:grid md:grid-cols-12 gap-4 mb-2 text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
@@ -569,6 +575,17 @@ export default function EditReceipt() {
           ))}
         </div>
 
+        {/* Add Line Button - Below items */}
+        <div className="flex justify-center mt-4">
+          <button
+            onClick={addLineItem}
+            className="btn-secondary flex items-center gap-2 text-sm"
+          >
+            <Plus size={16} />
+            Agregar Línea
+          </button>
+        </div>
+
         {/* Totals */}
         <div className="mt-6 pt-4 border-t" style={{ borderColor: 'var(--border-default)' }}>
           <div className="flex flex-col items-end gap-2">
@@ -622,17 +639,54 @@ export default function EditReceipt() {
           <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
             Forma de Pago
           </h2>
-          <select
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod | '')}
-            className="input w-full"
-          >
-            <option value="">-- Seleccionar forma de pago --</option>
-            <option value="Cheque">Cheque</option>
-            <option value="Transferencia">Transferencia</option>
-            <option value="Efectivo">Efectivo</option>
-            <option value="Otro">Otro</option>
-          </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <select
+              value={paymentMethod}
+              onChange={(e) => {
+                setPaymentMethod(e.target.value as PaymentMethod | '');
+                // Clear payment detail fields when changing method
+                setCheckNumber('');
+                setBankAccount('');
+              }}
+              className="input w-full"
+            >
+              <option value="">-- Seleccionar forma de pago --</option>
+              <option value="Efectivo">Efectivo</option>
+              <option value="Cheque">Cheque</option>
+              <option value="Transferencia">Transferencia</option>
+              <option value="Otro">Otro</option>
+            </select>
+            {/* Check Number field - shown when Cheque is selected */}
+            {paymentMethod === 'Cheque' && (
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  Número de Cheque
+                </label>
+                <input
+                  type="text"
+                  value={checkNumber}
+                  onChange={(e) => setCheckNumber(e.target.value)}
+                  placeholder="Ej: 001234"
+                  className="input w-full"
+                />
+              </div>
+            )}
+            {/* Bank Account field - shown when Transferencia is selected */}
+            {paymentMethod === 'Transferencia' && (
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  Número de Cuenta
+                </label>
+                <input
+                  type="text"
+                  value={bankAccount}
+                  onChange={(e) => setBankAccount(e.target.value)}
+                  placeholder="Ej: 123-456789-01"
+                  className="input w-full"
+                />
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -652,40 +706,83 @@ export default function EditReceipt() {
         </div>
       )}
 
-      {/* Signature - conditional */}
-      {fieldVisibility.signature && (
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
-          Firma
-        </h2>
+      {/* Signature + Name + Phone Section */}
+      {(fieldVisibility.signature || (fieldVisibility.received_by_name ?? true) || fieldVisibility.customer_phone) && (
+        <div className="card p-6">
+          {/* Signature - conditional - centered with inline label */}
+          {fieldVisibility.signature && (
+            <div className="mb-6">
+              <div className="flex items-center justify-center gap-4">
+                <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  Firma:
+                </span>
+                {signature ? (
+                  <div className="relative inline-block">
+                    <img
+                      src={signature}
+                      alt="Firma"
+                      className="border rounded-lg"
+                      style={{ borderColor: 'var(--border-default)', maxHeight: '80px' }}
+                    />
+                    <button
+                      onClick={handleRemoveSignature}
+                      className="absolute -top-2 -right-2 p-1 rounded-full bg-red-500 text-white hover:bg-red-600"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => setShowSignaturePad(true)}
+                    className="border-2 border-dashed rounded-lg px-8 py-4 text-center cursor-pointer transition-colors hover:border-primary"
+                    style={{ borderColor: 'var(--border-default)', minWidth: '200px' }}
+                  >
+                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                      Toca aquí para firmar
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-        {signature ? (
-          <div className="relative">
-            <img
-              src={signature}
-              alt="Firma"
-              className="border rounded-lg max-h-32 mx-auto"
-              style={{ borderColor: 'var(--border-default)' }}
-            />
-            <button
-              onClick={handleRemoveSignature}
-              className="absolute top-2 right-2 p-1 rounded-full bg-red-500 text-white hover:bg-red-600"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        ) : (
-          <div
-            onClick={() => setShowSignaturePad(true)}
-            className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors hover:border-primary"
-            style={{ borderColor: 'var(--border-default)' }}
-          >
-            <p style={{ color: 'var(--text-muted)' }}>
-              Toca aquí para firmar
-            </p>
-          </div>
-        )}
-      </div>
+          {/* Name and Phone Row - Below Signature */}
+          {((fieldVisibility.received_by_name ?? true) || fieldVisibility.customer_phone) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Received By Name - conditional */}
+              {(fieldVisibility.received_by_name ?? true) && (
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                    Nombre
+                  </label>
+                  <input
+                    type="text"
+                    value={receivedByName}
+                    onChange={(e) => setReceivedByName(e.target.value)}
+                    placeholder="Nombre de quien recibe"
+                    className="input w-full"
+                  />
+                </div>
+              )}
+
+              {/* Phone - conditional - moved here below name */}
+              {fieldVisibility.customer_phone && (
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                    Teléfono
+                  </label>
+                  <input
+                    type="tel"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    placeholder="Ej: 5555-1234"
+                    className="input w-full"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Bottom Action Buttons (Mobile) */}

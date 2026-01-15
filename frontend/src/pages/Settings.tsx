@@ -1,23 +1,29 @@
 import { useState, useEffect, useRef } from 'react';
-import { Sun, Moon, Settings as SettingsIcon, Building2, Save, Download, Upload, AlertCircle, CheckCircle, Eye } from 'lucide-react';
+import { Sun, Moon, Settings as SettingsIcon, Building2, Save, Download, Upload, AlertCircle, CheckCircle, Eye, FileText } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { downloadBackup, importBackup, ImportResult } from '../api/backup';
 import { useFieldVisibility } from '../context/FieldVisibilityContext';
-import { updateSettings } from '../api/settings';
+import { getSettings, updateSettings } from '../api/settings';
 
 // Company settings storage helpers
 export function getCompanySettings() {
   const stored = localStorage.getItem('companySettings');
   if (stored) {
-    return JSON.parse(stored);
+    const parsed = JSON.parse(stored);
+    return {
+      companyName: parsed.companyName || 'EMPRESA',
+      companyInfo: parsed.companyInfo || 'Dirección de la empresa | Tel: 0000-0000',
+      receiptTitle: parsed.receiptTitle || '',
+    };
   }
   return {
     companyName: 'EMPRESA',
     companyInfo: 'Dirección de la empresa | Tel: 0000-0000',
+    receiptTitle: '',
   };
 }
 
-export function saveCompanySettings(settings: { companyName: string; companyInfo: string }) {
+export function saveCompanySettings(settings: { companyName: string; companyInfo: string; receiptTitle: string }) {
   localStorage.setItem('companySettings', JSON.stringify(settings));
 }
 
@@ -28,6 +34,7 @@ export default function Settings() {
   // Company settings state
   const [companyName, setCompanyName] = useState('');
   const [companyInfo, setCompanyInfo] = useState('');
+  const [receiptTitle, setReceiptTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
@@ -38,19 +45,44 @@ export default function Settings() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load company settings on mount
+  // Load company settings on mount - from server first, then localStorage fallback
   useEffect(() => {
-    const settings = getCompanySettings();
-    setCompanyName(settings.companyName);
-    setCompanyInfo(settings.companyInfo);
+    const loadSettings = async () => {
+      try {
+        // Try to load from server first
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+          const serverSettings = await getSettings();
+          if (serverSettings) {
+            const name = serverSettings.company_name || 'EMPRESA';
+            const info = serverSettings.company_info || 'Dirección de la empresa | Tel: 0000-0000';
+            const title = serverSettings.receipt_title || '';
+            setCompanyName(name);
+            setCompanyInfo(info);
+            setReceiptTitle(title);
+            // Sync to localStorage for offline/quick access
+            saveCompanySettings({ companyName: name, companyInfo: info, receiptTitle: title });
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error loading settings from server:', error);
+      }
+      // Fallback to localStorage
+      const settings = getCompanySettings();
+      setCompanyName(settings.companyName);
+      setCompanyInfo(settings.companyInfo);
+      setReceiptTitle(settings.receiptTitle);
+    };
+    loadSettings();
   }, []);
 
   // Save company settings
   const handleSaveCompany = async () => {
     setIsSaving(true);
     try {
-      await updateSettings({ company_name: companyName, company_info: companyInfo });
-      saveCompanySettings({ companyName, companyInfo });
+      await updateSettings({ company_name: companyName, company_info: companyInfo, receipt_title: receiptTitle });
+      saveCompanySettings({ companyName, companyInfo, receiptTitle });
       setSaveMessage('Configuración guardada');
     } catch (error) {
       console.error('Error saving company settings:', error);
@@ -215,6 +247,82 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Receipt Header Card */}
+      <div className="card p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <FileText size={20} style={{ color: 'var(--color-primary)' }} />
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Encabezado del Recibo
+          </h2>
+        </div>
+
+        <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
+          Personaliza el título y qué información aparece en la parte superior del recibo impreso.
+        </p>
+
+        <div className="space-y-4">
+          {/* Custom Receipt Title */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+              Título del Recibo
+            </label>
+            <input
+              type="text"
+              value={receiptTitle}
+              onChange={(e) => setReceiptTitle(e.target.value)}
+              placeholder="RECIBO DE PAGO (dejar vacío para usar nombre de empresa)"
+              className="input w-full"
+            />
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+              Este título aparecerá en la parte superior del recibo impreso
+            </p>
+          </div>
+
+          {/* Header Toggles */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Show Company Name in Header */}
+            <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+              <input
+                type="checkbox"
+                checked={fieldVisibility.show_company_name_in_header ?? true}
+                onChange={(e) => handleFieldToggle('show_company_name_in_header', e.target.checked)}
+                className="w-5 h-5 cursor-pointer"
+              />
+              <div className="flex-1">
+                <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Mostrar Nombre de Empresa</div>
+                <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Muestra el nombre debajo del título</div>
+              </div>
+            </label>
+
+            {/* Show Company Info in Header */}
+            <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+              <input
+                type="checkbox"
+                checked={fieldVisibility.show_company_info_in_header ?? true}
+                onChange={(e) => handleFieldToggle('show_company_info_in_header', e.target.checked)}
+                className="w-5 h-5 cursor-pointer"
+              />
+              <div className="flex-1">
+                <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Mostrar Información Adicional</div>
+                <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Dirección, teléfono, NIT de la empresa</div>
+              </div>
+            </label>
+          </div>
+
+          {/* Save Button for Receipt Title */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleSaveCompany}
+              disabled={isSaving}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Save size={18} />
+              {isSaving ? 'Guardando...' : 'Guardar Título'}
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Field Visibility Card */}
       <div className="card p-6">
         <div className="flex items-center gap-2 mb-4">
@@ -229,6 +337,34 @@ export default function Settings() {
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Customer Name */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.customer_name ?? true}
+              onChange={(e) => handleFieldToggle('customer_name', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Nombre del Cliente</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>RECIBÍ DE</div>
+            </div>
+          </label>
+
+          {/* Customer NIT */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.customer_nit ?? true}
+              onChange={(e) => handleFieldToggle('customer_nit', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>NIT del Cliente</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>NIT</div>
+            </div>
+          </label>
+
           {/* Customer Address */}
           <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
             <input
@@ -282,6 +418,20 @@ export default function Settings() {
             <div className="flex-1">
               <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Institución</div>
               <div className="text-xs" style={{ color: 'var(--text-muted)' }}>INSTITUCION</div>
+            </div>
+          </label>
+
+          {/* Institution Auto-Fill */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.institution_use_company_name ?? false}
+              onChange={(e) => handleFieldToggle('institution_use_company_name', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Auto-rellenar Institución</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Usa nombre de empresa (no editable)</div>
             </div>
           </label>
 
@@ -350,8 +500,50 @@ export default function Settings() {
               className="w-5 h-5 cursor-pointer"
             />
             <div className="flex-1">
-              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Firma</div>
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Firma del Cliente</div>
               <div className="text-xs" style={{ color: 'var(--text-muted)' }}>FIRMA</div>
+            </div>
+          </label>
+
+          {/* Received By Name */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.received_by_name ?? true}
+              onChange={(e) => handleFieldToggle('received_by_name', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Nombre</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>NOMBRE: campo debajo de firma</div>
+            </div>
+          </label>
+
+          {/* Authorized Signature */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.authorized_signature ?? true}
+              onChange={(e) => handleFieldToggle('authorized_signature', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Firma Autorizada</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Cuadro "Firma Autorizada" en impresión</div>
+            </div>
+          </label>
+
+          {/* Payment Method in Print */}
+          <label className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors" style={{ backgroundColor: 'var(--surface-card-hover)' }}>
+            <input
+              type="checkbox"
+              checked={fieldVisibility.payment_method_in_print ?? true}
+              onChange={(e) => handleFieldToggle('payment_method_in_print', e.target.checked)}
+              className="w-5 h-5 cursor-pointer"
+            />
+            <div className="flex-1">
+              <div className="font-medium" style={{ color: 'var(--text-primary)' }}>Forma de Pago en Impresión</div>
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Mostrar forma de pago en área de firma</div>
             </div>
           </label>
 

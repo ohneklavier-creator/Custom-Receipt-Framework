@@ -46,7 +46,7 @@ export const PAYMENT_METHODS: Record<string, PaymentMethod> = {
 } as const;
 
 export interface ReceiptCreate {
-  customer_name: string;
+  customer_name?: string;  // Optional for institution-only receipts
   customer_nit?: string;
   customer_phone?: string;
   customer_email?: string;
@@ -55,16 +55,19 @@ export interface ReceiptCreate {
   status?: ReceiptStatus;
   notes?: string;
   signature?: string;
+  received_by_name?: string;  // Name below signature
   institution?: string;
   concept?: string;
   payment_method?: PaymentMethod;
+  check_number?: string;  // Check number for Cheque payments
+  bank_account?: string;  // Bank account for Transferencia payments
   items: ReceiptItem[];
 }
 
 export interface Receipt {
   id: number;
   receipt_number: string;
-  customer_name: string;
+  customer_name?: string;  // Optional for institution-only receipts
   customer_nit?: string;
   customer_phone?: string;
   customer_email?: string;
@@ -73,9 +76,12 @@ export interface Receipt {
   status: ReceiptStatus;
   notes?: string;
   signature?: string;
+  received_by_name?: string;  // Name below signature
   institution?: string;
   concept?: string;
   payment_method?: PaymentMethod;
+  check_number?: string;  // Check number for Cheque payments
+  bank_account?: string;  // Bank account for Transferencia payments
   subtotal: number;
   total: number;
   items: ReceiptItem[];
@@ -86,7 +92,7 @@ export interface Receipt {
 export interface ReceiptListItem {
   id: number;
   receipt_number: string;
-  customer_name: string;
+  customer_name?: string;  // Optional for institution-only receipts
   customer_nit?: string;
   date: string;
   status: ReceiptStatus;

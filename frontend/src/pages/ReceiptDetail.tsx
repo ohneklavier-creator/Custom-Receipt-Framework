@@ -56,8 +56,8 @@ export default function ReceiptDetail() {
   // Handle print
   const handlePrint = () => {
     if (receipt) {
-      const { companyName, companyInfo } = getCompanySettings();
-      printReceipt(receipt, companyName, companyInfo, fieldVisibility);
+      const { companyName, companyInfo, receiptTitle } = getCompanySettings();
+      printReceipt(receipt, companyName, companyInfo, fieldVisibility, receiptTitle);
     }
   };
 
@@ -199,10 +199,12 @@ export default function ReceiptDetail() {
                 <dt style={{ color: 'var(--text-muted)' }}>Nombre:</dt>
                 <dd style={{ color: 'var(--text-primary)' }}>{receipt.customer_name}</dd>
               </div>
-              <div className="flex justify-between">
-                <dt style={{ color: 'var(--text-muted)' }}>NIT:</dt>
-                <dd style={{ color: 'var(--text-primary)' }}>{receipt.customer_nit || 'CF'}</dd>
-              </div>
+              {(fieldVisibility.customer_nit ?? true) && (
+                <div className="flex justify-between">
+                  <dt style={{ color: 'var(--text-muted)' }}>NIT:</dt>
+                  <dd style={{ color: 'var(--text-primary)' }}>{receipt.customer_nit || 'CF'}</dd>
+                </div>
+              )}
               {receipt.customer_phone && (
                 <div className="flex justify-between">
                   <dt style={{ color: 'var(--text-muted)' }}>Teléfono:</dt>

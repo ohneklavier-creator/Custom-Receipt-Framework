@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { getSettings, updateSettings, FieldVisibilitySettings } from '../api/settings';
 
 const defaultFieldVisibility: FieldVisibilitySettings = {
+  customer_name: true,
+  customer_nit: true,
   customer_address: true,
   customer_phone: true,
   customer_email: true,
@@ -11,8 +13,15 @@ const defaultFieldVisibility: FieldVisibilitySettings = {
   payment_method: true,
   notes: true,
   signature: true,
+  received_by_name: true,  // NOMBRE field below signature
+  authorized_signature: true,  // Authorized signature box in print
+  payment_method_in_print: true,  // Payment method in print footer
   line_items: true,
   line_items_in_print: true,
+  // Print header controls
+  show_company_name_in_header: true,
+  show_company_info_in_header: true,
+  institution_use_company_name: false,
 };
 
 interface FieldVisibilityContextType {

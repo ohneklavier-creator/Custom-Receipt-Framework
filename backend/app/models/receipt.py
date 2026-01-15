@@ -44,7 +44,7 @@ class Receipt(Base, TimestampMixin):
     )
 
     # Customer information
-    customer_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    customer_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)  # Optional for institution-only receipts
     customer_nit: Mapped[Optional[str]] = mapped_column(String(50), index=True)
     customer_phone: Mapped[Optional[str]] = mapped_column(String(50))
     customer_email: Mapped[Optional[str]] = mapped_column(String(255))
@@ -65,11 +65,14 @@ class Receipt(Base, TimestampMixin):
     )
     notes: Mapped[Optional[str]] = mapped_column(Text)
     signature: Mapped[Optional[str]] = mapped_column(Text)  # Base64 encoded
+    received_by_name: Mapped[Optional[str]] = mapped_column(String(255))  # Name below signature
 
     # Additional receipt fields
     institution: Mapped[Optional[str]] = mapped_column(String(255))
     concept: Mapped[Optional[str]] = mapped_column(String(500))
     payment_method: Mapped[Optional[str]] = mapped_column(String(50))
+    check_number: Mapped[Optional[str]] = mapped_column(String(50))  # Check number for Cheque payments
+    bank_account: Mapped[Optional[str]] = mapped_column(String(100))  # Bank account for Transferencia payments
 
     # Calculated totals
     subtotal: Mapped[Decimal] = mapped_column(

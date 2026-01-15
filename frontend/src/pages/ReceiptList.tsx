@@ -87,8 +87,8 @@ export default function ReceiptList() {
   const handlePrint = async (receiptId: number) => {
     try {
       const fullReceipt = await getReceipt(receiptId);
-      const { companyName, companyInfo } = getCompanySettings();
-      printReceipt(fullReceipt, companyName, companyInfo, fieldVisibility);
+      const { companyName, companyInfo, receiptTitle } = getCompanySettings();
+      printReceipt(fullReceipt, companyName, companyInfo, fieldVisibility, receiptTitle);
     } catch (err) {
       console.error('Error printing receipt:', err);
       alert('Error al cargar el recibo para imprimir');
