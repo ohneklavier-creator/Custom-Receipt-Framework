@@ -806,10 +806,10 @@ export default function EditReceipt() {
 
       {/* Signature Modal */}
       {showSignaturePad && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white w-full h-full md:w-[90vw] md:h-[80vh] md:max-w-3xl md:rounded-lg flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white w-full max-w-2xl rounded-lg flex flex-col max-h-[90vh]">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b">
+            <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
               <h3 className="text-lg font-semibold text-gray-900">Firmar Recibo</h3>
               <button
                 onClick={() => setShowSignaturePad(false)}
@@ -819,9 +819,9 @@ export default function EditReceipt() {
               </button>
             </div>
 
-            {/* Signature Canvas */}
-            <div className="flex-1 p-4 bg-gray-50">
-              <div className="w-full h-full bg-white border rounded-lg">
+            {/* Signature Canvas - 16:9 aspect ratio */}
+            <div className="p-4 bg-gray-50 flex-shrink-0">
+              <div className="w-full bg-white border rounded-lg" style={{ aspectRatio: '16/9', maxHeight: '50vh' }}>
                 <canvas
                   ref={signatureCanvasRef}
                   className="touch-none"
@@ -830,7 +830,7 @@ export default function EditReceipt() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex gap-3 p-4 border-t">
+            <div className="flex gap-3 p-4 border-t flex-shrink-0">
               <button
                 onClick={handleClearSignature}
                 className="flex-1 py-3 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"

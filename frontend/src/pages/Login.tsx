@@ -55,36 +55,44 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+            <label htmlFor="username" className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
               Usuario o Correo
             </label>
             <div className="relative">
-              <User size={20} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+              <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
               <input
+                id="username"
+                name="username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="usuario o correo@ejemplo.com"
-                className="input w-full pl-10"
+                className="input w-full"
+                style={{ paddingLeft: '2.5rem' }}
                 required
                 autoFocus
+                autoComplete="username"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+            <label htmlFor="password" className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
               Contraseña
             </label>
             <div className="relative">
-              <Lock size={20} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-muted)' }} />
               <input
+                id="password"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="********"
-                className="input w-full pl-10"
+                className="input w-full"
+                style={{ paddingLeft: '2.5rem' }}
                 required
+                autoComplete="current-password"
               />
             </div>
           </div>

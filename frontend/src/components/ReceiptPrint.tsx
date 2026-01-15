@@ -196,7 +196,6 @@ export default function ReceiptPrint({
 
       {/* Footer */}
       <div className="receipt-footer">
-        <p>Gracias por su preferencia</p>
       </div>
     </div>
   );
@@ -254,11 +253,6 @@ export function printReceipt(
   // Header visibility helpers
   const showCompanyName = visibility.show_company_name_in_header ?? true;
   const showCompanyInfo = visibility.show_company_info_in_header ?? true;
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    alert('Por favor permita las ventanas emergentes para imprimir.');
-    return;
-  }
 
   const formatCurrency = (amount: number | string) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -407,7 +401,10 @@ export function printReceipt(
           display: flex;
           align-items: center;
           gap: 15px;
-          margin-bottom: 12px;
+          margin-bottom: 8px;
+          border-bottom: 1px solid black;
+          padding-bottom: 4px;
+          width: 66%;
         }
 
         .signature-label-inline {
@@ -416,14 +413,15 @@ export function printReceipt(
         }
 
         .signature-area {
-          min-width: 150px;
-          border-bottom: 1px solid black;
-          padding-bottom: 4px;
+          flex: 1;
         }
 
         .signature-area img {
-          max-height: 60px;
-          max-width: 200px;
+          height: 50px;
+          width: auto;
+          max-width: 250px;
+          object-fit: contain;
+          object-position: left;
         }
 
         .signature-placeholder {
@@ -443,12 +441,10 @@ export function printReceipt(
         }
 
         .name-field-left {
-          border-bottom: 1px solid #999;
           padding-bottom: 2px;
         }
 
         .phone-field {
-          border-bottom: 1px solid #999;
           padding-bottom: 2px;
         }
 
@@ -664,17 +660,54 @@ export function printReceipt(
       ` : ''}
 
       <div class="footer">
-        <p>Gracias por su preferencia</p>
       </div>
     </body>
     </html>
   `;
 
-  printWindow.document.write(html);
-  printWindow.document.close();
+  // Use iframe-based printing to avoid popup blockers (especially on iOS Safari)
+  // Remove any existing print iframe
+  const existingFrame = document.getElementById('print-receipt-iframe');
+  if (existingFrame) {
+    existingFrame.remove();
+  }
+
+  // Create hidden iframe
+  const iframe = document.createElement('iframe');
+  iframe.id = 'print-receipt-iframe';
+  iframe.style.position = 'absolute';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = 'none';
+  iframe.style.left = '-9999px';
+  iframe.style.top = '-9999px';
+  document.body.appendChild(iframe);
+
+  const iframeDoc = iframe.contentWindow?.document;
+  if (!iframeDoc) {
+    alert('Error al preparar la impresión.');
+    return;
+  }
+
+  iframeDoc.open();
+  iframeDoc.write(html);
+  iframeDoc.close();
 
   // Wait for content to load then print
-  printWindow.onload = () => {
-    printWindow.print();
+  const triggerPrint = () => {
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } catch (e) {
+      console.error('Print error:', e);
+    }
+    // Clean up iframe after a delay to allow print dialog to complete
+    setTimeout(() => {
+      iframe.remove();
+    }, 1000);
   };
+
+  // Use setTimeout to ensure content is fully rendered before printing
+  // This works better across all browsers including iOS Safari
+  setTimeout(triggerPrint, 300);
 }
